@@ -109,6 +109,20 @@ More explicit license information at the end of file.
 			#define MU_NULL_PTR 0
 		#endif
 
+		#ifdef MU_MUTEX
+			#define muLock muMutex
+			#define mu_lock_create mu_mutex_create
+			#define mu_lock_destroy mu_mutex_destroy
+			#define mu_lock_lock mu_mutex_lock
+			#define mu_lock_unlock mu_mutex_unlock
+		#else
+			#define muLock muSpinlock
+			#define mu_lock_create mu_spinlock_create
+			#define mu_lock_destroy mu_spinlock_destroy
+			#define mu_lock_lock mu_spinlock_lock
+			#define mu_lock_unlock mu_spinlock_unlock
+		#endif
+
 	/* Operating system */
 
 		#if !defined(MU_WIN32) && !defined(MU_UNIX)
