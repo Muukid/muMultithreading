@@ -8,6 +8,7 @@ More explicit license information at the end of file.
 
 @MENTION All C standard library dependencies are noted BESIDES OS-specific ones
 @MENTION Prob have to link against pthread
+@MENTION mu_thread_wait has to be called to get return value
 */
 
 #ifndef MUM_H
