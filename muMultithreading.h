@@ -165,6 +165,22 @@ More explicit license information at the end of file.
 					return MU_ZERO_STRUCT(muMutex);
 				}
 
+			/* Spinlock */
+
+				struct muSpinlock {
+					muBool active;
+					int locked;
+				};
+				typedef struct muSpinlock muSpinlock;
+
+				muSpinlock mu_inner_spinlock_destroy(mumResult* result, muSpinlock spinlock) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+					if (spinlock.active) {
+
+					}
+					return MU_ZERO_STRUCT(muSpinlock);
+				}
+
 		#endif
 
 	/* Functions */
@@ -173,18 +189,30 @@ More explicit license information at the end of file.
 			MUDEF const char* mum_result_get_name(mumResult result);
 		#endif
 
-		MUDEF muThread mu_thread_create(mumResult* result, void (*start)(void* args), void* args);
-		MUDEF muThread mu_thread_destroy(mumResult* result, muThread thread);
+		/* Thread */
 
-		MUDEF void mu_thread_exit(void* ret);
-		MUDEF void mu_thread_wait(mumResult* result, muThread* p_thread);
-		MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread);
+			MUDEF muThread mu_thread_create(mumResult* result, void (*start)(void* args), void* args);
+			MUDEF muThread mu_thread_destroy(mumResult* result, muThread thread);
 
-		MUDEF muMutex mu_mutex_create(mumResult* result);
-		MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex);
+			MUDEF void mu_thread_exit(void* ret);
+			MUDEF void mu_thread_wait(mumResult* result, muThread* p_thread);
+			MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread);
 
-		MUDEF void mu_mutex_lock(mumResult* result, muMutex* p_mutex);
-		MUDEF void mu_mutex_unlock(mumResult* result, muMutex* p_mutex);
+		/* Mutex */
+
+			MUDEF muMutex mu_mutex_create(mumResult* result);
+			MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex);
+
+			MUDEF void mu_mutex_lock(mumResult* result, muMutex* p_mutex);
+			MUDEF void mu_mutex_unlock(mumResult* result, muMutex* p_mutex);
+
+		/* Spinlock */
+
+			MUDEF muSpinlock mu_spinlock_create(mumResult* result);
+			MUDEF muSpinlock mu_spinlock_destroy(mumResult* result, muSpinlock spinlock);
+
+			MUDEF void mu_spinlock_lock(mumResult* result, muSpinlock* p_spinlock);
+			MUDEF void mu_spinlock_unlock(mumResult* result, muSpinlock* p_spinlock);
 
 	#ifdef __cplusplus
 		}
@@ -233,102 +261,156 @@ More explicit license information at the end of file.
 
 		/* API functions */
 
-			#define MU_UNIX_CHECK_THREAD_ACTIVE(ret) if(thread.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_THREAD;}return ret;}
-			#define MU_UNIX_CHECK_PTHREAD_ACTIVE(ret) if(p_thread->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_THREAD;}return ret;}
-			#define MU_UNIX_CHECK_MUTEX_ACTIVE(ret) if(mutex.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
-			#define MU_UNIX_CHECK_PMUTEX_ACTIVE(ret) if(p_mutex->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
+			/* Thread */
 
-			MUDEF muThread mu_thread_create(mumResult* result, void (*start)(void* args), void* args) {
-				MU_SET_RESULT(result, MUM_SUCCESS)
+				#define MU_UNIX_CHECK_THREAD_ACTIVE(ret) if(thread.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_THREAD;}return ret;}
+				#define MU_UNIX_CHECK_PTHREAD_ACTIVE(ret) if(p_thread->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_THREAD;}return ret;}
 
-				muThread thread = MU_ZERO_STRUCT(muThread);
-				thread.active = MU_TRUE;
+				MUDEF muThread mu_thread_create(mumResult* result, void (*start)(void* args), void* args) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
 
-				void* (*func)(void*);
-				mu_memcpy(&func, &start, sizeof(void*));
-				if (pthread_create(&thread.thread, 0, func, args) != 0) {
-					MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
-					return MU_ZERO_STRUCT(muThread);
+					muThread thread = MU_ZERO_STRUCT(muThread);
+					thread.active = MU_TRUE;
+
+					void* (*func)(void*);
+					mu_memcpy(&func, &start, sizeof(void*));
+					if (pthread_create(&thread.thread, 0, func, args) != 0) {
+						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
+						return MU_ZERO_STRUCT(muThread);
+					}
+
+					thread.ret = MU_NULL_PTR;
+					return thread;
 				}
 
-				thread.ret = MU_NULL_PTR;
-				return thread;
-			}
+				MUDEF muThread mu_thread_destroy(mumResult* result, muThread thread) {
+					MU_UNIX_CHECK_THREAD_ACTIVE(thread)
 
-			MUDEF muThread mu_thread_destroy(mumResult* result, muThread thread) {
-				MU_UNIX_CHECK_THREAD_ACTIVE(thread)
-
-				mumResult res = MUM_SUCCESS;
-				thread = mu_inner_thread_destroy(&res, thread);
-				MU_SET_RESULT(result, res)
-				return thread;
-			}
-
-			MUDEF void mu_thread_exit(void* ret) {
-				pthread_exit(ret);
-			}
-
-			MUDEF void mu_thread_wait(mumResult* result, muThread* p_thread) {
-				MU_SET_RESULT(result, MUM_SUCCESS)
-
-				MU_UNIX_CHECK_PTHREAD_ACTIVE()
-
-				if (pthread_join(p_thread->thread, &p_thread->ret) != 0) {
-					MU_SET_RESULT(result, MUM_WAIT_CALL_FAILED)
-					return;
-				}
-			}
-
-			MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread) {
-				MU_SET_RESULT(result, MUM_SUCCESS)
-
-				MU_UNIX_CHECK_THREAD_ACTIVE(MU_NULL_PTR)
-
-				return thread.ret;
-			}
-
-			MUDEF muMutex mu_mutex_create(mumResult* result) {
-				MU_SET_RESULT(result, MUM_SUCCESS)
-
-				muMutex mutex = MU_ZERO_STRUCT(muMutex);
-				mutex.active = MU_TRUE;
-
-				if (pthread_mutex_init(&mutex.mutex, 0) != 0) {
-					MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
-					return MU_ZERO_STRUCT(muMutex);
+					mumResult res = MUM_SUCCESS;
+					thread = mu_inner_thread_destroy(&res, thread);
+					MU_SET_RESULT(result, res)
+					return thread;
 				}
 
-				return mutex;
-			}
-
-			MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex) {
-				MU_UNIX_CHECK_MUTEX_ACTIVE(mutex)
-
-				mumResult res = MUM_SUCCESS;
-				mutex = mu_inner_mutex_destroy(&res, mutex);
-				MU_SET_RESULT(result, res)
-				return mutex;
-			}
-
-			MUDEF void mu_mutex_lock(mumResult* result, muMutex* p_mutex) {
-				MU_SET_RESULT(result, MUM_SUCCESS)
-				MU_UNIX_CHECK_PMUTEX_ACTIVE()
-
-				if (pthread_mutex_lock(&p_mutex->mutex) != 0) {
-					MU_SET_RESULT(result, MUM_LOCK_CALL_FAILED)
-					return;
+				MUDEF void mu_thread_exit(void* ret) {
+					pthread_exit(ret);
 				}
-			}
 
-			MUDEF void mu_mutex_unlock(mumResult* result, muMutex* p_mutex) {
-				MU_SET_RESULT(result, MUM_SUCCESS)
-				MU_UNIX_CHECK_PMUTEX_ACTIVE()
+				MUDEF void mu_thread_wait(mumResult* result, muThread* p_thread) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
 
-				if (pthread_mutex_unlock(&p_mutex->mutex) != 0) {
-					MU_SET_RESULT(result, MUM_UNLOCK_CALL_FAILED)
-					return;
+					MU_UNIX_CHECK_PTHREAD_ACTIVE()
+
+					if (pthread_join(p_thread->thread, &p_thread->ret) != 0) {
+						MU_SET_RESULT(result, MUM_WAIT_CALL_FAILED)
+						return;
+					}
 				}
-			}
+
+				MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					MU_UNIX_CHECK_THREAD_ACTIVE(MU_NULL_PTR)
+
+					return thread.ret;
+				}
+
+			/* Mutex */
+
+				#define MU_UNIX_CHECK_MUTEX_ACTIVE(ret) if(mutex.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
+				#define MU_UNIX_CHECK_PMUTEX_ACTIVE(ret) if(p_mutex->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
+
+				MUDEF muMutex mu_mutex_create(mumResult* result) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					muMutex mutex = MU_ZERO_STRUCT(muMutex);
+					mutex.active = MU_TRUE;
+
+					if (pthread_mutex_init(&mutex.mutex, 0) != 0) {
+						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
+						return MU_ZERO_STRUCT(muMutex);
+					}
+
+					return mutex;
+				}
+
+				MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex) {
+					MU_UNIX_CHECK_MUTEX_ACTIVE(mutex)
+
+					mumResult res = MUM_SUCCESS;
+					mutex = mu_inner_mutex_destroy(&res, mutex);
+					MU_SET_RESULT(result, res)
+					return mutex;
+				}
+
+				MUDEF void mu_mutex_lock(mumResult* result, muMutex* p_mutex) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+					MU_UNIX_CHECK_PMUTEX_ACTIVE()
+
+					if (pthread_mutex_lock(&p_mutex->mutex) != 0) {
+						MU_SET_RESULT(result, MUM_LOCK_CALL_FAILED)
+						return;
+					}
+				}
+
+				MUDEF void mu_mutex_unlock(mumResult* result, muMutex* p_mutex) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+					MU_UNIX_CHECK_PMUTEX_ACTIVE()
+
+					if (pthread_mutex_unlock(&p_mutex->mutex) != 0) {
+						MU_SET_RESULT(result, MUM_UNLOCK_CALL_FAILED)
+						return;
+					}
+				}
+
+			/* Spinlock */
+
+				// A lot of this code is stolen from:
+				// https://github.com/stepancheg/no-mutex-c
+
+				static inline muBool mum_atomic_compare_exchange(int* ptr, int compare, int exchange) {
+					return __atomic_compare_exchange_n(ptr, &compare, exchange, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+				}
+
+				static inline void mum_atomic_store(int* ptr, int value) {
+					if (value) {}
+					__atomic_store_n(ptr, 0, __ATOMIC_SEQ_CST);
+				}
+
+				#define MU_UNIX_CHECK_SPINLOCK_ACTIVE(ret) if(spinlock.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
+				#define MU_UNIX_CHECK_PSPINLOCK_ACTIVE(ret) if(p_spinlock->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
+
+				MUDEF muSpinlock mu_spinlock_create(mumResult* result) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					muSpinlock spinlock = MU_ZERO_STRUCT(muSpinlock);
+					spinlock.active = MU_TRUE;
+
+					return spinlock;
+				}
+
+				MUDEF muSpinlock mu_spinlock_destroy(mumResult* result, muSpinlock spinlock) {
+					MU_UNIX_CHECK_SPINLOCK_ACTIVE(spinlock)
+
+					mumResult res = MUM_SUCCESS;
+					spinlock = mu_inner_spinlock_destroy(&res, spinlock);
+					MU_SET_RESULT(result, res)
+					return spinlock;
+				}
+
+				MUDEF void mu_spinlock_lock(mumResult* result, muSpinlock* p_spinlock) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					while (!mum_atomic_compare_exchange(&p_spinlock->locked, 0, 1)) {
+
+					}
+				}
+
+				MUDEF void mu_spinlock_unlock(mumResult* result, muSpinlock* p_spinlock) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					mum_atomic_store(&p_spinlock->locked, 0);
+				}
 
 	#endif /* MU_UNIX */
 
