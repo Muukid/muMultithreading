@@ -97,6 +97,7 @@ More explicit license information at the end of file.
 			MUM_WAIT_CALL_FAILED,
 			MUM_INVALID_THREAD,
 			MUM_INVALID_MUTEX,
+			MUM_INVALID_SPINLOCK,
 			MUM_PREVIOUS_THREAD_CLOSED_BEFORE_LOCK,
 			MUM_THREAD_TIMED_OUT
 		};
@@ -137,10 +138,56 @@ More explicit license information at the end of file.
 
 		#if defined(MU_WIN32)
 
-			struct muThread {
+			#include <windows.h>
 
-			};
-			typedef struct muThread muThread;
+			/* Thread */
+
+				struct muThread {
+					muBool active;
+					HANDLE thread;
+					DWORD id;
+				};
+				typedef struct muThread muThread;
+
+				muThread mu_inner_thread_destroy(mumResult* result, muThread thread) {
+					if (CloseHandle(thread.thread) != 0) {
+						MU_SET_RESULT(result, MUM_DESTROY_CALL_FAILED)
+						return thread;
+					}
+					return MU_ZERO_STRUCT(muThread);
+				}
+
+			/* Mutex */
+
+				struct muMutex {
+					muBool active;
+					HANDLE mutex;
+				};
+				typedef struct muMutex muMutex;
+
+				muMutex mu_inner_mutex_destroy(mumResult* result, muMutex mutex) {
+					if (CloseHandle(mutex.mutex) != 0) {
+						MU_SET_RESULT(result, MUM_DESTROY_CALL_FAILED)
+						return mutex;
+					}
+					return MU_ZERO_STRUCT(muMutex);
+				}
+
+			/* Spinlock */
+
+				struct muSpinlock {
+					muBool active;
+					LONG volatile locked;
+				};
+				typedef struct muSpinlock muSpinlock;
+
+				muSpinlock mu_inner_spinlock_destroy(mumResult* result, muSpinlock spinlock) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+					if (spinlock.active) {
+
+					}
+					return MU_ZERO_STRUCT(muSpinlock);
+				}
 
 		#elif defined(MU_UNIX)
 
@@ -254,6 +301,7 @@ More explicit license information at the end of file.
 					case MUM_WAIT_CALL_FAILED: return "MUM_WAIT_CALL_FAILED"; break;
 					case MUM_INVALID_THREAD: return "MUM_INVALID_THREAD"; break;
 					case MUM_INVALID_MUTEX: return "MUM_INVALID_MUTEX"; break;
+					case MUM_INVALID_SPINLOCK: return "MUM_INVALID_SPINLOCK"; break;
 					case MUM_PREVIOUS_THREAD_CLOSED_BEFORE_LOCK: return "MUM_PREVIOUS_THREAD_CLOSED_BEFORE_LOCK"; break;
 					case MUM_FAILURE: return "MUM_FAILURE"; break;
 					case MUM_THREAD_TIMED_OUT: return "MUM_THREAD_TIMED_OUT"; break;
@@ -265,7 +313,195 @@ More explicit license information at the end of file.
 
 	#ifdef MU_WIN32
 
-		// ...
+		/* API functions */
+
+			/* Thread */
+
+				#define MU_WIN32_CHECK_THREAD_ACTIVE(ret) if(thread.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_THREAD;}return ret;}
+				#define MU_WIN32_CHECK_PTHREAD_ACTIVE(ret) if(p_thread->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_THREAD;}return ret;}
+
+				MUDEF muThread mu_thread_create(mumResult* result, void (*start)(void* args), void* args) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					muThread thread = MU_ZERO_STRUCT(muThread);
+					thread.active = MU_TRUE;
+
+					LPTHREAD_START_ROUTINE lp_start;
+					mu_memcpy(&lp_start, &start, sizeof(void*));
+					thread.thread = CreateThread(0, 0, lp_start, args, 0, &thread.id);
+
+					if (thread.thread == 0) {
+						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
+						return MU_ZERO_STRUCT(muThread);
+					}
+
+					return thread;
+				}
+
+				MUDEF muThread mu_thread_destroy(mumResult* result, muThread thread) {
+					MU_WIN32_CHECK_THREAD_ACTIVE(thread)
+
+					mumResult res = MUM_SUCCESS;
+					thread = mu_inner_thread_destroy(&res, thread);
+					MU_SET_RESULT(result, res)
+					return thread;
+				}
+
+				MUDEF void mu_thread_exit(void* ret) {
+					DWORD d;
+					mu_memcpy(&d, &ret, sizeof(DWORD));
+					ExitThread(d);
+				}
+
+				MUDEF void mu_thread_wait(mumResult* result, muThread* p_thread) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					MU_WIN32_CHECK_PTHREAD_ACTIVE()
+
+					DWORD wait_result = WaitForSingleObject(p_thread->thread, INFINITE);
+
+					switch (wait_result) {
+						case WAIT_TIMEOUT: {
+							MU_SET_RESULT(result, MUM_THREAD_TIMED_OUT)
+						} break;
+
+						case WAIT_FAILED: {
+							MU_SET_RESULT(result, MUM_FAILURE)
+						} break;
+					}
+				}
+
+				MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					MU_WIN32_CHECK_THREAD_ACTIVE(MU_NULL_PTR)
+
+					DWORD exit_code = 0;
+					GetExitCodeThread(thread.thread, &exit_code);
+
+					void* p;
+					mu_memcpy(&p, &exit_code, sizeof(DWORD));
+					return p;
+				}
+
+			/* Mutex */
+
+				#define MU_WIN32_CHECK_MUTEX_ACTIVE(ret) if(mutex.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
+				#define MU_WIN32_CHECK_PMUTEX_ACTIVE(ret) if(p_mutex->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
+
+				MUDEF muMutex mu_mutex_create(mumResult* result) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					muMutex mutex = MU_ZERO_STRUCT(muMutex);
+					mutex.active = MU_TRUE;
+
+					mutex.mutex = CreateMutex(0, MU_FALSE, 0);
+					if (mutex.mutex == 0) {
+						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
+						return MU_ZERO_STRUCT(muMutex);
+					}
+
+					return mutex;
+				}
+
+				MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex) {
+					MU_WIN32_CHECK_MUTEX_ACTIVE(mutex)
+
+					mumResult res = MUM_SUCCESS;
+					mutex = mu_inner_mutex_destroy(&res, mutex);
+					MU_SET_RESULT(result, res)
+					return mutex;
+				}
+
+				MUDEF void mu_mutex_lock(mumResult* result, muMutex* p_mutex) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+					MU_WIN32_CHECK_PMUTEX_ACTIVE()
+
+					DWORD wait_result = WaitForSingleObject(p_mutex->mutex, INFINITE);
+
+					switch (wait_result) {
+						// The mutex has most likely been closed. This should pretty much never happen with
+						// the way mum is set up, but if it has, that's really bad. Most likely, rather mum
+						// is not working as intended at all, or the user has modified things that they
+						// shouldn't.
+						case WAIT_FAILED: {
+							MU_SET_RESULT(result, MUM_INVALID_MUTEX)
+						} break;
+
+						// The thread holding the mutex has died. This can be due to a few things:
+						// * The thread crashed or otherwise imploded in on itself.
+						// * I forgot to put an unlock call on an error return case.
+						// * The user has fiddled around with values they shouldn't.
+						// Either way, this is REALLY, REALLY bad, and will lead to sporadic random bugs &
+						// crashes.
+						// Note: we still have ownership due to this, but ehhhhh.
+						// https://devblogs.microsoft.com/oldnewthing/20050912-14/?p=34253
+						// (Raymond Chen is awesome btw)
+						case WAIT_ABANDONED: {
+							MU_SET_RESULT(result, MUM_PREVIOUS_THREAD_CLOSED_BEFORE_LOCK)
+						} break;
+					}
+				}
+
+				MUDEF void mu_mutex_unlock(mumResult* result, muMutex* p_mutex) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+					MU_WIN32_CHECK_PMUTEX_ACTIVE()
+
+					if (!ReleaseMutex(p_mutex->mutex)) {
+						MU_SET_RESULT(result, MUM_UNLOCK_CALL_FAILED)
+						return;
+					}
+				}
+
+			/* Spinlock */
+
+				static inline muBool mum_atomic_compare_exchange(LONG volatile* ptr, LONG compare, LONG exchange) {
+					return InterlockedCompareExchange(ptr, exchange, compare) != exchange;
+				}
+
+				// Kind of a hack
+				static inline void mum_atomic_store(LONG volatile* ptr, long value) {
+					if (value == 0) {
+						_interlockedbittestandreset(ptr, 0);
+					} else {
+						_interlockedbittestandset(ptr, 0);
+					}
+				}
+
+				#define MU_WIN32_CHECK_SPINLOCK_ACTIVE(ret) if(spinlock.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_SPINLOCK;}return ret;}
+				#define MU_WIN32_CHECK_PSPINLOCK_ACTIVE(ret) if(p_spinlock->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_SPINLOCK;}return ret;}
+
+				MUDEF muSpinlock mu_spinlock_create(mumResult* result) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					muSpinlock spinlock = MU_ZERO_STRUCT(muSpinlock);
+					spinlock.active = MU_TRUE;
+
+					return spinlock;
+				}
+
+				MUDEF muSpinlock mu_spinlock_destroy(mumResult* result, muSpinlock spinlock) {
+					MU_WIN32_CHECK_SPINLOCK_ACTIVE(spinlock)
+
+					mumResult res = MUM_SUCCESS;
+					spinlock = mu_inner_spinlock_destroy(&res, spinlock);
+					MU_SET_RESULT(result, res)
+					return spinlock;
+				}
+
+				MUDEF void mu_spinlock_lock(mumResult* result, muSpinlock* p_spinlock) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					while (!mum_atomic_compare_exchange(&p_spinlock->locked, 0, 1)) {
+
+					}
+				}
+
+				MUDEF void mu_spinlock_unlock(mumResult* result, muSpinlock* p_spinlock) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+
+					mum_atomic_store(&p_spinlock->locked, 0);
+				}
 
 	#endif
 
@@ -391,8 +627,8 @@ More explicit license information at the end of file.
 					__atomic_store_n(ptr, 0, __ATOMIC_SEQ_CST);
 				}
 
-				#define MU_UNIX_CHECK_SPINLOCK_ACTIVE(ret) if(spinlock.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
-				#define MU_UNIX_CHECK_PSPINLOCK_ACTIVE(ret) if(p_spinlock->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_MUTEX;}return ret;}
+				#define MU_UNIX_CHECK_SPINLOCK_ACTIVE(ret) if(spinlock.active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_SPINLOCK;}return ret;}
+				#define MU_UNIX_CHECK_PSPINLOCK_ACTIVE(ret) if(p_spinlock->active!=MU_TRUE){if(result!=MU_NULL_PTR){*result=MUM_INVALID_SPINLOCK;}return ret;}
 
 				MUDEF muSpinlock mu_spinlock_create(mumResult* result) {
 					MU_SET_RESULT(result, MUM_SUCCESS)
