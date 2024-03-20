@@ -925,6 +925,7 @@ More explicit license information at the end of file.
 
 		#define muThread size_m
 		#define muMutex size_m
+		#define muSpinlock size_m
 
 		#ifdef MU_SPINLOCK
 			#define muLock muSpinlock
@@ -977,6 +978,14 @@ More explicit license information at the end of file.
 
 			MUDEF void mu_mutex_lock(mumResult* result, muMutex mutex);
 			MUDEF void mu_mutex_unlock(mumResult* result, muMutex mutex);
+
+		/* Spinlock */
+
+			MUDEF muSpinlock mu_spinlock_create(mumResult* result);
+			MUDEF muSpinlock mu_spinlock_destroy(mumResult* result, muSpinlock spinlock);
+
+			MUDEF void mu_spinlock_lock(mumResult* result, muSpinlock spinlock);
+			MUDEF void mu_spinlock_unlock(mumResult* result, muSpinlock spinlock);
 
 	#ifdef __cplusplus
 	}
@@ -1206,6 +1215,21 @@ More explicit license information at the end of file.
 
 				MU_HRARRAY_DEFAULT_FUNC(mu_unix_mutex)
 
+			/* Spinlock */
+
+				struct mu_unix_spinlock {
+					muBool active;
+					int locked;
+
+					#ifdef MU_THREADSAFE
+					muBool lock_active;
+					MU_LOCK lock;
+					#endif
+				};
+				typedef struct mu_unix_spinlock mu_unix_spinlock;
+
+				MU_HRARRAY_DEFAULT_FUNC(mu_unix_spinlock)
+
 		/* Initiation / Termination */
 
 			/* Setup */
@@ -1215,6 +1239,8 @@ More explicit license information at the end of file.
 					#define MU_GTHREADS mum_global_context->threads
 					mu_unix_mutex_array mutexes;
 					#define MU_GMUTEXES mum_global_context->mutexes
+					mu_unix_spinlock_array spinlocks;
+					#define MU_GSPINLOCKS mum_global_context->spinlocks
 				};
 
 			/* API-level */
@@ -1231,6 +1257,7 @@ More explicit license information at the end of file.
 
 					MU_GTHREADS = MU_ZERO_STRUCT(mu_unix_thread_array);
 					MU_GMUTEXES = MU_ZERO_STRUCT(mu_unix_mutex_array);
+					MU_GSPINLOCKS = MU_ZERO_STRUCT(mu_unix_spinlock_array);
 				}
 
 				MUDEF void mum_term(mumResult* result) {
@@ -1247,6 +1274,11 @@ More explicit license information at the end of file.
 						mu_mutex_destroy(0, i);
 					}
 					mu_unix_mutex_destroy(0, &MU_GMUTEXES);
+
+					for (size_m i = 0; i < MU_GSPINLOCKS.length; i++) {
+						mu_spinlock_destroy(0, i);
+					}
+					mu_unix_spinlock_destroy(0, &MU_GSPINLOCKS);
 
 					mu_free(mum_global_context);
 					mum_global_context = MU_NULL_PTR;
@@ -1376,6 +1408,8 @@ More explicit license information at the end of file.
 				// it, which is already a horrible situation to be in. Pretty sure deleting a mutex
 				// with a thread having it locked is already undefined behavior anyway.
 
+				// Note that this same logic applies to the other locks.
+
 				MUDEF void mu_mutex_lock(mumResult* result, muMutex mutex) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
 					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return;, mu_unix_mutex_)
@@ -1394,6 +1428,57 @@ More explicit license information at the end of file.
 						MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_) return;
 					)
 					MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
+				}
+
+		/* Spinlocks */
+
+			/* API-level */
+
+				MUDEF muSpinlock mu_spinlock_create(mumResult* result) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+					MU_ASSERT(mum_global_context != MU_NULL_PTR, result, MUM_NOT_YET_INITIALIZED, return MU_NONE;)
+
+					size_m spinlock = MU_NONE;
+					mumaResult muma_res = MUMA_SUCCESS;
+					mu_unix_spinlock_find_push(&muma_res, &MU_GSPINLOCKS, MU_ZERO_STRUCT(mu_unix_spinlock), &spinlock);
+					MU_ASSERT(muma_res == MUMA_SUCCESS && spinlock != MU_NONE, result, muma_result_to_mum_result(muma_res),
+						return MU_NONE;
+					)
+
+					mu_unix_spinlock_hold_element(0, &MU_GSPINLOCKS, spinlock);
+					MU_GSPINLOCKS.data[spinlock].locked = 0;
+
+					MU_GSPINLOCKS.data[spinlock].active = MU_TRUE;
+					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_unix_spinlock_)
+					return spinlock;
+				}
+
+				MUDEF muSpinlock mu_spinlock_destroy(mumResult* result, muSpinlock spinlock) {
+					MU_SAFEFUNC(result, MUM_, mum_global_context, return spinlock;)
+					MU_HOLD(result, spinlock, MU_GSPINLOCKS, mum_global_context, MUM_, return spinlock;, mu_unix_spinlock_)
+
+					MU_GSPINLOCKS.data[spinlock].locked = 0;
+					MU_GSPINLOCKS.data[spinlock].active = MU_FALSE;
+					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_unix_spinlock_)
+					return MU_NONE;
+				}
+
+				MUDEF void mu_spinlock_lock(mumResult* result, muSpinlock spinlock) {
+					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
+					MU_HOLD(result, spinlock, MU_GSPINLOCKS, mum_global_context, MUM_, return;, mu_unix_spinlock_)
+
+					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_unix_spinlock_)
+					// Note that this is a bit less safe than mutexes, but there's little I can do
+					// in this position.
+					while (!mum_atomic_compare_exchange(&MU_GSPINLOCKS.data[spinlock].locked, 0, 1)) {}
+				}
+
+				MUDEF void mu_spinlock_unlock(mumResult* result, muSpinlock spinlock) {
+					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
+					MU_HOLD(result, spinlock, MU_GSPINLOCKS, mum_global_context, MUM_, return;, mu_unix_spinlock_)
+
+					mum_atomic_store(&MU_GSPINLOCKS.data[spinlock].locked, 0);
+					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_unix_spinlock_)
 				}
 
 	#endif /* MU_UNIX */
