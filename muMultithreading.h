@@ -913,6 +913,8 @@ More explicit license information at the end of file.
 			MUM_CREATE_CALL_FAILED,
 			MUM_DESTROY_CALL_FAILED,
 			MUM_WAIT_CALL_FAILED,
+			MUM_LOCK_CALL_FAILED,
+			MUM_UNLOCK_CALL_FAILED,
 
 			MUM_INVALID_ID
 		};
@@ -922,6 +924,21 @@ More explicit license information at the end of file.
 	/* Macros */
 
 		#define muThread size_m
+		#define muMutex size_m
+
+		#ifdef MU_SPINLOCK
+			#define muLock muSpinlock
+			#define mu_lock_create mu_spinlock_create
+			#define mu_lock_destroy mu_spinlock_destroy
+			#define mu_lock_lock mu_spinlock_lock
+			#define mu_lock_unlock mu_spinlock_unlock
+		#else
+			#define muLock muMutex
+			#define mu_lock_create mu_mutex_create
+			#define mu_lock_destroy mu_mutex_destroy
+			#define mu_lock_lock mu_mutex_lock
+			#define mu_lock_unlock mu_mutex_unlock
+		#endif
 
 	/* Incomplete types */
 
@@ -952,6 +969,14 @@ More explicit license information at the end of file.
 			MUDEF void mu_thread_exit(void* ret);
 			MUDEF void mu_thread_wait(mumResult* result, muThread thread);
 			MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread);
+
+		/* Mutex */
+
+			MUDEF muMutex mu_mutex_create(mumResult* result);
+			MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex);
+
+			MUDEF void mu_mutex_lock(mumResult* result, muMutex mutex);
+			MUDEF void mu_mutex_unlock(mumResult* result, muMutex mutex);
 
 	#ifdef __cplusplus
 	}
@@ -1016,6 +1041,9 @@ More explicit license information at the end of file.
 						case MUM_NOT_YET_INITIALIZED: return "MUM_NOT_YET_INITIALIZED"; break;
 						case MUM_CREATE_CALL_FAILED: return "MUM_CREATE_CALL_FAILED"; break;
 						case MUM_DESTROY_CALL_FAILED: return "MUM_DESTROY_CALL_FAILED"; break;
+						case MUM_WAIT_CALL_FAILED: return "MUM_WAIT_CALL_FAILED"; break;
+						case MUM_LOCK_CALL_FAILED: return "MUM_LOCK_CALL_FAILED"; break;
+						case MUM_UNLOCK_CALL_FAILED: return "MUM_UNLOCK_CALL_FAILED"; break;
 						case MUM_INVALID_ID: return "MUM_INVALID_ID"; break;
 					}
 				}
@@ -1066,59 +1094,33 @@ More explicit license information at the end of file.
 			}
 
 			#ifdef MU_THREADSAFE
-				#ifdef MU_MUTEX
 
-					#define MU_LOCK pthread_mutex_t
+				#define MU_LOCK pthread_mutex_t
 
-					#define MU_LOCK_CREATE(lock, lock_active) \
-						if (pthread_mutex_init(&lock, 0) == 0) { \
-							lock_active = MU_TRUE; \
-						} else { \
+				#define MU_LOCK_CREATE(lock, lock_active) \
+					if (pthread_mutex_init(&lock, 0) == 0) { \
+						lock_active = MU_TRUE; \
+					} else { \
+						lock_active = MU_FALSE; \
+					}
+
+				#define MU_LOCK_DESTROY(lock, lock_active) \
+					if (lock_active) { \
+						if (pthread_mutex_destroy(&lock) == 0) { \
 							lock_active = MU_FALSE; \
-						}
+						} \
+					}
 
-					#define MU_LOCK_DESTROY(lock, lock_active) \
-						if (lock_active) { \
-							if (pthread_mutex_destroy(&lock) == 0) { \
-								lock_active = MU_FALSE; \
-							} \
-						}
+				#define MU_LOCK_LOCK(lock, lock_active) \
+					if (lock_active) { \
+						pthread_mutex_lock(&lock); \
+					}
 
-					#define MU_LOCK_LOCK(lock, lock_active) \
-						if (lock_active) { \
-							pthread_mutex_lock(&lock); \
-						}
+				#define MU_LOCK_UNLOCK(lock, lock_active) \
+					if (lock_active) { \
+						pthread_mutex_unlock(&lock); \
+					}
 
-					#define MU_LOCK_UNLOCK(lock, lock_active) \
-						if (lock_active) { \
-							pthread_mutex_unlock(&lock); \
-						}
-
-				#else
-
-					#define MU_LOCK int
-
-					#define MU_LOCK_CREATE(lock, lock_active) \
-						if (!lock_active) { \
-							lock_active = MU_TRUE; \
-						}
-
-					#define MU_LOCK_DESTROY(lock, lock_active) \
-						if (lock_active) { \
-							lock_active = MU_FALSE; \
-						}
-
-					#define MU_LOCK_LOCK(lock, lock_active) \
-						if (lock_active) { \
-							while (!mum_atomic_compare_exchange(&lock, 0, 1)) {} \
-						}
-
-					#define MU_LOCK_UNLOCK(lock, lock_active) \
-						if (lock_active) { \
-							mum_atomic_store(&lock, 0); \
-						}
-
-				#endif
 			#else
 
 				#define MU_LOCK_CREATE(lock, active)
@@ -1128,21 +1130,48 @@ More explicit license information at the end of file.
 
 			#endif
 
-			#define mu_da_find_push(da, index, push_func, push, muma_res, fail) \
-				index = MU_NONE; \
-				for (size_m i = 0; i < da.length; i++) { \
-					if (!da.data[i].active) { \
-						index = i; \
-						break; \
+			#define MU_HRARRAY_DEFAULT_FUNC(name) \
+				muBool name##_comp(name t0, name t1) { \
+					return t0.active == t1.active; \
+				} \
+				\
+				void name##_on_creation(name* p) { \
+					if (p != MU_NULL_PTR) { \
+						MU_LOCK_CREATE(p->lock, p->lock_active) \
 					} \
 				} \
-				if (index == MU_NONE) { \
-					push_func(&muma_res, &da, push); \
-					if (muma_res != MUMA_SUCCESS) { \
-						fail \
+				void name##_on_destruction(name* p) { \
+					if (p != MU_NULL_PTR) { \
+						MU_LOCK_DESTROY(p->lock, p->lock_active) \
 					} \
-					index = da.length-1; \
-				}
+				} \
+				void name##_on_hold(name* p) { \
+					if (p != MU_NULL_PTR) { \
+						MU_LOCK_LOCK(p->lock, p->lock_active) \
+					} \
+				} \
+				void name##_on_release(name* p) { \
+					if (p != MU_NULL_PTR) { \
+						MU_LOCK_UNLOCK(p->lock, p->lock_active) \
+					} \
+				} \
+				\
+				mu_dynamic_hrarray_declaration( \
+					name##_array, name, name##_, name##_comp, \
+					name##_on_creation, name##_on_destruction, name##_on_hold, name##_on_release \
+				)
+
+			#define MU_SAFEFUNC(result, lib_prefix, context, fail_return) \
+				MU_SET_RESULT(result, lib_prefix##SUCCESS) \
+				MU_ASSERT(context != MU_NULL_PTR, result, lib_prefix##NOT_YET_INITIALIZED, fail_return) \
+
+			#define MU_HOLD(result, item, da, context, lib_prefix, fail_return, da_prefix) \
+				MU_ASSERT(item < da.length, result, lib_prefix##INVALID_ID, fail_return) \
+				da_prefix##hold_element(0, &da, item); \
+				MU_ASSERT(da.data[item].active, result, lib_prefix##INVALID_ID, da_prefix##release_element(0, &da, item); fail_return)
+
+			#define MU_RELEASE(da, item, da_prefix) \
+				da_prefix##release_element(0, &da, item);
 
 		/* Arrays */
 
@@ -1160,35 +1189,22 @@ More explicit license information at the end of file.
 				};
 				typedef struct mu_unix_thread mu_unix_thread;
 
-				muBool mu_unix_thread_comp(mu_unix_thread t0, mu_unix_thread t1) {
-					return t0.active == t1.active && /*t0.handle == t1.handle &&*/ t0.ret == t1.ret;
-				}
+				MU_HRARRAY_DEFAULT_FUNC(mu_unix_thread)
 
-				void mu_unix_thread_on_creation(mu_unix_thread* p) {
-					if (p != MU_NULL_PTR) {
-						MU_LOCK_CREATE(p->lock, p->lock_active)
-					}
-				}
-				void mu_unix_thread_on_destruction(mu_unix_thread* p) {
-					if (p != MU_NULL_PTR) {
-						MU_LOCK_DESTROY(p->lock, p->lock_active)
-					}
-				}
-				void mu_unix_thread_on_hold(mu_unix_thread* p) {
-					if (p != MU_NULL_PTR) {
-						MU_LOCK_LOCK(p->lock, p->lock_active)
-					}
-				}
-				void mu_unix_thread_on_release(mu_unix_thread* p) {
-					if (p != MU_NULL_PTR) {
-						MU_LOCK_UNLOCK(p->lock, p->lock_active)
-					}
-				}
+			/* Mutex */
 
-				mu_dynamic_hrarray_declaration(
-					mu_unix_thread_array, mu_unix_thread, mu_unix_thread_, mu_unix_thread_comp,
-					mu_unix_thread_on_creation, mu_unix_thread_on_destruction, mu_unix_thread_on_hold, mu_unix_thread_on_release
-				)
+				struct mu_unix_mutex {
+					muBool active;
+					pthread_mutex_t handle;
+
+					#ifdef MU_THREADSAFE
+					muBool lock_active;
+					MU_LOCK lock;
+					#endif
+				};
+				typedef struct mu_unix_mutex mu_unix_mutex;
+
+				MU_HRARRAY_DEFAULT_FUNC(mu_unix_mutex)
 
 		/* Initiation / Termination */
 
@@ -1197,6 +1213,8 @@ More explicit license information at the end of file.
 				struct mumContext {
 					mu_unix_thread_array threads;
 					#define MU_GTHREADS mum_global_context->threads
+					mu_unix_mutex_array mutexes;
+					#define MU_GMUTEXES mum_global_context->mutexes
 				};
 
 			/* API-level */
@@ -1212,6 +1230,7 @@ More explicit license information at the end of file.
 					MU_ASSERT(mum_global_context != 0, result, MUM_ALLOCATION_FAILED, return;)
 
 					MU_GTHREADS = MU_ZERO_STRUCT(mu_unix_thread_array);
+					MU_GMUTEXES = MU_ZERO_STRUCT(mu_unix_mutex_array);
 				}
 
 				MUDEF void mum_term(mumResult* result) {
@@ -1223,6 +1242,11 @@ More explicit license information at the end of file.
 						mu_thread_destroy(0, i);
 					}
 					mu_unix_thread_destroy(0, &MU_GTHREADS);
+
+					for (size_m i = 0; i < MU_GMUTEXES.length; i++) {
+						mu_mutex_destroy(0, i);
+					}
+					mu_unix_mutex_destroy(0, &MU_GMUTEXES);
 
 					mu_free(mum_global_context);
 					mum_global_context = MU_NULL_PTR;
@@ -1239,45 +1263,35 @@ More explicit license information at the end of file.
 
 					size_m thread = MU_NONE;
 					mumaResult muma_res = MUMA_SUCCESS;
-					mu_da_find_push(
-						MU_GTHREADS, thread, mu_unix_thread_push, MU_ZERO_STRUCT(mu_unix_thread), muma_res,
-						MU_SET_RESULT(result, muma_result_to_mum_result(muma_res)) return MU_NONE;
+					mu_unix_thread_find_push(&muma_res, &MU_GTHREADS, MU_ZERO_STRUCT(mu_unix_thread), &thread);
+					MU_ASSERT(muma_res == MUMA_SUCCESS && thread != MU_NONE, result, muma_result_to_mum_result(muma_res), 
+						return MU_NONE;
 					)
 
 					mu_unix_thread_hold_element(0, &MU_GTHREADS, thread);
-					MU_GTHREADS.data[thread].active = MU_TRUE;
-
 					void* (*func)(void*);
 					mu_memcpy(&func, &start, sizeof(void*));
 					if (pthread_create(&MU_GTHREADS.data[thread].handle, 0, func, args) != 0) {
-						MU_GTHREADS.data[thread].active = MU_FALSE;
-						mu_unix_thread_release_element(0, &MU_GTHREADS, thread);
+						MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
 						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
 						return MU_NONE;
 					}
 
-					mu_unix_thread_release_element(0, &MU_GTHREADS, thread);
+					MU_GTHREADS.data[thread].active = MU_TRUE;
+					MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
 					return thread;
 				}
 
 				MUDEF muThread mu_thread_destroy(mumResult* result, muThread thread) {
-					MU_SET_RESULT(result, MUM_SUCCESS)
-
-					MU_ASSERT(mum_global_context != MU_NULL_PTR, result, MUM_NOT_YET_INITIALIZED, return thread;)
-
-					MU_ASSERT(thread < MU_GTHREADS.length, result, MUM_INVALID_ID, 
-						return thread;
-					)
-					mu_unix_thread_hold_element(0, &MU_GTHREADS, thread);
-					MU_ASSERT(MU_GTHREADS.data[thread].active, result, MUM_INVALID_ID,
-						mu_unix_thread_release_element(0, &MU_GTHREADS, thread); return thread;
-					)
+					MU_SAFEFUNC(result, MUM_, mum_global_context, return thread;)
+					MU_HOLD(result, thread, MU_GTHREADS, mum_global_context, MUM_, return thread;, mu_unix_thread_)
 
 					MU_ASSERT(pthread_cancel(MU_GTHREADS.data[thread].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
-						mu_unix_thread_release_element(0, &MU_GTHREADS, thread); return thread;
+						MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_) return thread;
 					)
+					MU_GTHREADS.data[thread].active = MU_FALSE;
 
-					mu_unix_thread_release_element(0, &MU_GTHREADS, thread);
+					MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
 					return MU_NONE;
 				}
 
@@ -1286,38 +1300,100 @@ More explicit license information at the end of file.
 				}
 
 				MUDEF void mu_thread_wait(mumResult* result, muThread thread) {
-					MU_SET_RESULT(result, MUM_SUCCESS)
-					MU_ASSERT(mum_global_context != MU_NULL_PTR, result, MUM_NOT_YET_INITIALIZED, return;)
-
-					MU_ASSERT(thread < MU_GTHREADS.length, result, MUM_INVALID_ID, 
-						return;
-					)
-					mu_unix_thread_hold_element(0, &MU_GTHREADS, thread);
-					MU_ASSERT(MU_GTHREADS.data[thread].active, result, MUM_INVALID_ID,
-						mu_unix_thread_release_element(0, &MU_GTHREADS, thread); return;
-					)
+					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
+					MU_HOLD(result, thread, MU_GTHREADS, mum_global_context, MUM_, return;, mu_unix_thread_)
 
 					MU_ASSERT(pthread_join(MU_GTHREADS.data[thread].handle, &MU_GTHREADS.data[thread].ret) == 0, result, MUM_WAIT_CALL_FAILED,
-						mu_unix_thread_release_element(0, &MU_GTHREADS, thread); return;
+						MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_) return;
 					)
-					mu_unix_thread_release_element(0, &MU_GTHREADS, thread);
+					MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
 				}
 
 				MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread) {
-					MU_SET_RESULT(result, MUM_SUCCESS)
-					MU_ASSERT(mum_global_context != MU_NULL_PTR, result, MUM_NOT_YET_INITIALIZED, return MU_NULL_PTR;)
-
-					MU_ASSERT(thread < MU_GTHREADS.length, result, MUM_INVALID_ID, 
-						return MU_NULL_PTR;
-					)
-					mu_unix_thread_hold_element(0, &MU_GTHREADS, thread);
-					MU_ASSERT(MU_GTHREADS.data[thread].active, result, MUM_INVALID_ID,
-						mu_unix_thread_release_element(0, &MU_GTHREADS, thread); return MU_NULL_PTR;
-					)
+					MU_SAFEFUNC(result, MUM_, mum_global_context, return MU_NULL_PTR;)
+					MU_HOLD(result, thread, MU_GTHREADS, mum_global_context, MUM_, return MU_NULL_PTR;, mu_unix_thread_)
 
 					void* ret = MU_GTHREADS.data[thread].ret;
-					mu_unix_thread_release_element(0, &MU_GTHREADS, thread);
+					MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
 					return ret;
+				}
+
+		/* Mutexes */
+
+			/* API-level */
+
+				MUDEF muMutex mu_mutex_create(mumResult* result) {
+					MU_SET_RESULT(result, MUM_SUCCESS)
+					MU_ASSERT(mum_global_context != MU_NULL_PTR, result, MUM_NOT_YET_INITIALIZED, return MU_NONE;)
+
+					size_m mutex = MU_NONE;
+					mumaResult muma_res = MUMA_SUCCESS;
+					mu_unix_mutex_find_push(&muma_res, &MU_GMUTEXES, MU_ZERO_STRUCT(mu_unix_mutex), &mutex);
+					MU_ASSERT(muma_res == MUMA_SUCCESS && mutex != MU_NONE, result, muma_result_to_mum_result(muma_res),
+						return MU_NONE;
+					)
+
+					mu_unix_mutex_hold_element(0, &MU_GMUTEXES, mutex);
+					if (pthread_mutex_init(&MU_GMUTEXES.data[mutex].handle, 0) != 0) {
+						MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
+						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
+						return MU_NONE;
+					}
+
+					MU_GMUTEXES.data[mutex].active = MU_TRUE;
+					MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
+					return mutex;
+				}
+
+				MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex) {
+					MU_SAFEFUNC(result, MUM_, mum_global_context, return mutex;)
+					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return mutex;, mu_unix_mutex_)
+
+					MU_ASSERT(pthread_mutex_destroy(&MU_GMUTEXES.data[mutex].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
+						MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_) return mutex;
+					)
+					MU_GMUTEXES.data[mutex].active = MU_FALSE;
+					MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
+					return MU_NONE;
+				}
+
+				// This poses an odd structural challenge. If we make both the lock & unlock
+				// function hold the mutex, you reach a deadlock pretty easily, ie:
+
+				// * Thread 1 locks mutex, quickly holding and releasing it.
+				// * Thread 2 attempts to lock mutex, holding it and waiting for it to be unlocked,
+				// * Thread 1 is done, and attempts to unlock the mutex, so it tries to hold it,
+				// but it's still being held by thread 2 who is attempting to lock it, so you reach
+				// a deadlock.
+
+				// This can be solved by:
+				// A) Making the 'lock mutex' function release the function early, allowing it to
+				// wait to lock it without holding it during that wait time.
+				// B) Make the 'unlock mutex' function not hold/release the mutex.
+
+				// I've chosen A because the only way it *doesn't* work well is if the user deletes
+				// a mutex while a thread is running with it locked AND another one is waiting on
+				// it, which is already a horrible situation to be in. Pretty sure deleting a mutex
+				// with a thread having it locked is already undefined behavior anyway.
+
+				MUDEF void mu_mutex_lock(mumResult* result, muMutex mutex) {
+					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
+					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return;, mu_unix_mutex_)
+
+					MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
+					MU_ASSERT(pthread_mutex_lock(&MU_GMUTEXES.data[mutex].handle) == 0, result, MUM_LOCK_CALL_FAILED, 
+						return;
+					)
+				}
+
+				MUDEF void mu_mutex_unlock(mumResult* result, muMutex mutex) {
+					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
+					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return;, mu_unix_mutex_)
+
+					MU_ASSERT(pthread_mutex_unlock(&MU_GMUTEXES.data[mutex].handle) == 0, result, MUM_UNLOCK_CALL_FAILED, 
+						MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_) return;
+					)
+					MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
 				}
 
 	#endif /* MU_UNIX */
