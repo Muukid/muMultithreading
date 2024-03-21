@@ -1232,11 +1232,11 @@ More explicit license information at the end of file.
 
 				struct mumContext {
 					mu_unix_thread_array threads;
-					#define MU_GTHREADS mum_global_context->threads
+					#define MUM_GTHREADS mum_global_context->threads
 					mu_unix_mutex_array mutexes;
-					#define MU_GMUTEXES mum_global_context->mutexes
+					#define MUM_GMUTEXES mum_global_context->mutexes
 					mu_unix_spinlock_array spinlocks;
-					#define MU_GSPINLOCKS mum_global_context->spinlocks
+					#define MUM_GSPINLOCKS mum_global_context->spinlocks
 				};
 
 			/* API-level */
@@ -1251,9 +1251,9 @@ More explicit license information at the end of file.
 					mum_global_context = (mumContext*)mu_malloc(sizeof(mumContext));
 					MU_ASSERT(mum_global_context != 0, result, MUM_ALLOCATION_FAILED, return;)
 
-					MU_GTHREADS = MU_ZERO_STRUCT(mu_unix_thread_array);
-					MU_GMUTEXES = MU_ZERO_STRUCT(mu_unix_mutex_array);
-					MU_GSPINLOCKS = MU_ZERO_STRUCT(mu_unix_spinlock_array);
+					MUM_GTHREADS = MU_ZERO_STRUCT(mu_unix_thread_array);
+					MUM_GMUTEXES = MU_ZERO_STRUCT(mu_unix_mutex_array);
+					MUM_GSPINLOCKS = MU_ZERO_STRUCT(mu_unix_spinlock_array);
 				}
 
 				MUDEF void mum_term(mumResult* result) {
@@ -1261,20 +1261,20 @@ More explicit license information at the end of file.
 
 					MU_ASSERT(mum_global_context != MU_NULL_PTR, result, MUM_ALREADY_TERMINATED, return;)
 
-					for (size_m i = 0; i < MU_GTHREADS.length; i++) {
+					for (size_m i = 0; i < MUM_GTHREADS.length; i++) {
 						mu_thread_destroy(0, i);
 					}
-					mu_unix_thread_destroy(0, &MU_GTHREADS);
+					mu_unix_thread_destroy(0, &MUM_GTHREADS);
 
-					for (size_m i = 0; i < MU_GMUTEXES.length; i++) {
+					for (size_m i = 0; i < MUM_GMUTEXES.length; i++) {
 						mu_mutex_destroy(0, i);
 					}
-					mu_unix_mutex_destroy(0, &MU_GMUTEXES);
+					mu_unix_mutex_destroy(0, &MUM_GMUTEXES);
 
-					for (size_m i = 0; i < MU_GSPINLOCKS.length; i++) {
+					for (size_m i = 0; i < MUM_GSPINLOCKS.length; i++) {
 						mu_spinlock_destroy(0, i);
 					}
-					mu_unix_spinlock_destroy(0, &MU_GSPINLOCKS);
+					mu_unix_spinlock_destroy(0, &MUM_GSPINLOCKS);
 
 					mu_free(mum_global_context);
 					mum_global_context = MU_NULL_PTR;
@@ -1291,35 +1291,35 @@ More explicit license information at the end of file.
 
 					size_m thread = MU_NONE;
 					mumaResult muma_res = MUMA_SUCCESS;
-					mu_unix_thread_find_push(&muma_res, &MU_GTHREADS, MU_ZERO_STRUCT(mu_unix_thread), &thread);
+					mu_unix_thread_find_push(&muma_res, &MUM_GTHREADS, MU_ZERO_STRUCT(mu_unix_thread), &thread);
 					MU_ASSERT(muma_res == MUMA_SUCCESS && thread != MU_NONE, result, muma_result_to_mum_result(muma_res), 
 						return MU_NONE;
 					)
 
-					mu_unix_thread_hold_element(0, &MU_GTHREADS, thread);
+					mu_unix_thread_hold_element(0, &MUM_GTHREADS, thread);
 					void* (*func)(void*);
 					mu_memcpy(&func, &start, sizeof(void*));
-					if (pthread_create(&MU_GTHREADS.data[thread].handle, 0, func, args) != 0) {
-						MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
+					if (pthread_create(&MUM_GTHREADS.data[thread].handle, 0, func, args) != 0) {
+						MU_RELEASE(MUM_GTHREADS, thread, mu_unix_thread_)
 						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
 						return MU_NONE;
 					}
 
-					MU_GTHREADS.data[thread].active = MU_TRUE;
-					MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
+					MUM_GTHREADS.data[thread].active = MU_TRUE;
+					MU_RELEASE(MUM_GTHREADS, thread, mu_unix_thread_)
 					return thread;
 				}
 
 				MUDEF muThread mu_thread_destroy(mumResult* result, muThread thread) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return thread;)
-					MU_HOLD(result, thread, MU_GTHREADS, mum_global_context, MUM_, return thread;, mu_unix_thread_)
+					MU_HOLD(result, thread, MUM_GTHREADS, mum_global_context, MUM_, return thread;, mu_unix_thread_)
 
-					MU_ASSERT(pthread_cancel(MU_GTHREADS.data[thread].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
-						MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_) return thread;
+					MU_ASSERT(pthread_cancel(MUM_GTHREADS.data[thread].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
+						MU_RELEASE(MUM_GTHREADS, thread, mu_unix_thread_) return thread;
 					)
-					MU_GTHREADS.data[thread].active = MU_FALSE;
+					MUM_GTHREADS.data[thread].active = MU_FALSE;
 
-					MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
+					MU_RELEASE(MUM_GTHREADS, thread, mu_unix_thread_)
 					return MU_NONE;
 				}
 
@@ -1329,20 +1329,20 @@ More explicit license information at the end of file.
 
 				MUDEF void mu_thread_wait(mumResult* result, muThread thread) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, thread, MU_GTHREADS, mum_global_context, MUM_, return;, mu_unix_thread_)
+					MU_HOLD(result, thread, MUM_GTHREADS, mum_global_context, MUM_, return;, mu_unix_thread_)
 
-					MU_ASSERT(pthread_join(MU_GTHREADS.data[thread].handle, &MU_GTHREADS.data[thread].ret) == 0, result, MUM_WAIT_CALL_FAILED,
-						MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_) return;
+					MU_ASSERT(pthread_join(MUM_GTHREADS.data[thread].handle, &MUM_GTHREADS.data[thread].ret) == 0, result, MUM_WAIT_CALL_FAILED,
+						MU_RELEASE(MUM_GTHREADS, thread, mu_unix_thread_) return;
 					)
-					MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
+					MU_RELEASE(MUM_GTHREADS, thread, mu_unix_thread_)
 				}
 
 				MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return MU_NULL_PTR;)
-					MU_HOLD(result, thread, MU_GTHREADS, mum_global_context, MUM_, return MU_NULL_PTR;, mu_unix_thread_)
+					MU_HOLD(result, thread, MUM_GTHREADS, mum_global_context, MUM_, return MU_NULL_PTR;, mu_unix_thread_)
 
-					void* ret = MU_GTHREADS.data[thread].ret;
-					MU_RELEASE(MU_GTHREADS, thread, mu_unix_thread_)
+					void* ret = MUM_GTHREADS.data[thread].ret;
+					MU_RELEASE(MUM_GTHREADS, thread, mu_unix_thread_)
 					return ret;
 				}
 
@@ -1356,32 +1356,32 @@ More explicit license information at the end of file.
 
 					size_m mutex = MU_NONE;
 					mumaResult muma_res = MUMA_SUCCESS;
-					mu_unix_mutex_find_push(&muma_res, &MU_GMUTEXES, MU_ZERO_STRUCT(mu_unix_mutex), &mutex);
+					mu_unix_mutex_find_push(&muma_res, &MUM_GMUTEXES, MU_ZERO_STRUCT(mu_unix_mutex), &mutex);
 					MU_ASSERT(muma_res == MUMA_SUCCESS && mutex != MU_NONE, result, muma_result_to_mum_result(muma_res),
 						return MU_NONE;
 					)
 
-					mu_unix_mutex_hold_element(0, &MU_GMUTEXES, mutex);
-					if (pthread_mutex_init(&MU_GMUTEXES.data[mutex].handle, 0) != 0) {
-						MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
+					mu_unix_mutex_hold_element(0, &MUM_GMUTEXES, mutex);
+					if (pthread_mutex_init(&MUM_GMUTEXES.data[mutex].handle, 0) != 0) {
+						MU_RELEASE(MUM_GMUTEXES, mutex, mu_unix_mutex_)
 						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
 						return MU_NONE;
 					}
 
-					MU_GMUTEXES.data[mutex].active = MU_TRUE;
-					MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
+					MUM_GMUTEXES.data[mutex].active = MU_TRUE;
+					MU_RELEASE(MUM_GMUTEXES, mutex, mu_unix_mutex_)
 					return mutex;
 				}
 
 				MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return mutex;)
-					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return mutex;, mu_unix_mutex_)
+					MU_HOLD(result, mutex, MUM_GMUTEXES, mum_global_context, MUM_, return mutex;, mu_unix_mutex_)
 
-					MU_ASSERT(pthread_mutex_destroy(&MU_GMUTEXES.data[mutex].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
-						MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_) return mutex;
+					MU_ASSERT(pthread_mutex_destroy(&MUM_GMUTEXES.data[mutex].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
+						MU_RELEASE(MUM_GMUTEXES, mutex, mu_unix_mutex_) return mutex;
 					)
-					MU_GMUTEXES.data[mutex].active = MU_FALSE;
-					MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
+					MUM_GMUTEXES.data[mutex].active = MU_FALSE;
+					MU_RELEASE(MUM_GMUTEXES, mutex, mu_unix_mutex_)
 					return MU_NONE;
 				}
 
@@ -1408,22 +1408,22 @@ More explicit license information at the end of file.
 
 				MUDEF void mu_mutex_lock(mumResult* result, muMutex mutex) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return;, mu_unix_mutex_)
+					MU_HOLD(result, mutex, MUM_GMUTEXES, mum_global_context, MUM_, return;, mu_unix_mutex_)
 
-					MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
-					MU_ASSERT(pthread_mutex_lock(&MU_GMUTEXES.data[mutex].handle) == 0, result, MUM_LOCK_CALL_FAILED, 
+					MU_RELEASE(MUM_GMUTEXES, mutex, mu_unix_mutex_)
+					MU_ASSERT(pthread_mutex_lock(&MUM_GMUTEXES.data[mutex].handle) == 0, result, MUM_LOCK_CALL_FAILED, 
 						return;
 					)
 				}
 
 				MUDEF void mu_mutex_unlock(mumResult* result, muMutex mutex) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return;, mu_unix_mutex_)
+					MU_HOLD(result, mutex, MUM_GMUTEXES, mum_global_context, MUM_, return;, mu_unix_mutex_)
 
-					MU_ASSERT(pthread_mutex_unlock(&MU_GMUTEXES.data[mutex].handle) == 0, result, MUM_UNLOCK_CALL_FAILED, 
-						MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_) return;
+					MU_ASSERT(pthread_mutex_unlock(&MUM_GMUTEXES.data[mutex].handle) == 0, result, MUM_UNLOCK_CALL_FAILED, 
+						MU_RELEASE(MUM_GMUTEXES, mutex, mu_unix_mutex_) return;
 					)
-					MU_RELEASE(MU_GMUTEXES, mutex, mu_unix_mutex_)
+					MU_RELEASE(MUM_GMUTEXES, mutex, mu_unix_mutex_)
 				}
 
 		/* Spinlocks */
@@ -1436,45 +1436,45 @@ More explicit license information at the end of file.
 
 					size_m spinlock = MU_NONE;
 					mumaResult muma_res = MUMA_SUCCESS;
-					mu_unix_spinlock_find_push(&muma_res, &MU_GSPINLOCKS, MU_ZERO_STRUCT(mu_unix_spinlock), &spinlock);
+					mu_unix_spinlock_find_push(&muma_res, &MUM_GSPINLOCKS, MU_ZERO_STRUCT(mu_unix_spinlock), &spinlock);
 					MU_ASSERT(muma_res == MUMA_SUCCESS && spinlock != MU_NONE, result, muma_result_to_mum_result(muma_res),
 						return MU_NONE;
 					)
 
-					mu_unix_spinlock_hold_element(0, &MU_GSPINLOCKS, spinlock);
-					MU_GSPINLOCKS.data[spinlock].locked = 0;
+					mu_unix_spinlock_hold_element(0, &MUM_GSPINLOCKS, spinlock);
+					MUM_GSPINLOCKS.data[spinlock].locked = 0;
 
-					MU_GSPINLOCKS.data[spinlock].active = MU_TRUE;
-					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_unix_spinlock_)
+					MUM_GSPINLOCKS.data[spinlock].active = MU_TRUE;
+					MU_RELEASE(MUM_GSPINLOCKS, spinlock, mu_unix_spinlock_)
 					return spinlock;
 				}
 
 				MUDEF muSpinlock mu_spinlock_destroy(mumResult* result, muSpinlock spinlock) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return spinlock;)
-					MU_HOLD(result, spinlock, MU_GSPINLOCKS, mum_global_context, MUM_, return spinlock;, mu_unix_spinlock_)
+					MU_HOLD(result, spinlock, MUM_GSPINLOCKS, mum_global_context, MUM_, return spinlock;, mu_unix_spinlock_)
 
-					MU_GSPINLOCKS.data[spinlock].locked = 0;
-					MU_GSPINLOCKS.data[spinlock].active = MU_FALSE;
-					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_unix_spinlock_)
+					MUM_GSPINLOCKS.data[spinlock].locked = 0;
+					MUM_GSPINLOCKS.data[spinlock].active = MU_FALSE;
+					MU_RELEASE(MUM_GSPINLOCKS, spinlock, mu_unix_spinlock_)
 					return MU_NONE;
 				}
 
 				MUDEF void mu_spinlock_lock(mumResult* result, muSpinlock spinlock) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, spinlock, MU_GSPINLOCKS, mum_global_context, MUM_, return;, mu_unix_spinlock_)
+					MU_HOLD(result, spinlock, MUM_GSPINLOCKS, mum_global_context, MUM_, return;, mu_unix_spinlock_)
 
-					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_unix_spinlock_)
+					MU_RELEASE(MUM_GSPINLOCKS, spinlock, mu_unix_spinlock_)
 					// Note that this is a bit less safe than mutexes, but there's little I can do
 					// in this position.
-					while (!mum_atomic_compare_exchange(&MU_GSPINLOCKS.data[spinlock].locked, 0, 1)) {}
+					while (!mum_atomic_compare_exchange(&MUM_GSPINLOCKS.data[spinlock].locked, 0, 1)) {}
 				}
 
 				MUDEF void mu_spinlock_unlock(mumResult* result, muSpinlock spinlock) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, spinlock, MU_GSPINLOCKS, mum_global_context, MUM_, return;, mu_unix_spinlock_)
+					MU_HOLD(result, spinlock, MUM_GSPINLOCKS, mum_global_context, MUM_, return;, mu_unix_spinlock_)
 
-					mum_atomic_store(&MU_GSPINLOCKS.data[spinlock].locked, 0);
-					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_unix_spinlock_)
+					mum_atomic_store(&MUM_GSPINLOCKS.data[spinlock].locked, 0);
+					MU_RELEASE(MUM_GSPINLOCKS, spinlock, mu_unix_spinlock_)
 				}
 
 	#endif /* MU_UNIX */
@@ -1589,11 +1589,11 @@ More explicit license information at the end of file.
 
 				struct mumContext {
 					mu_win32_thread_array threads;
-					#define MU_GTHREADS mum_global_context->threads
+					#define MUM_GTHREADS mum_global_context->threads
 					mu_win32_mutex_array mutexes;
-					#define MU_GMUTEXES mum_global_context->mutexes
+					#define MUM_GMUTEXES mum_global_context->mutexes
 					mu_win32_spinlock_array spinlocks;
-					#define MU_GSPINLOCKS mum_global_context->spinlocks
+					#define MUM_GSPINLOCKS mum_global_context->spinlocks
 				};
 
 			/* API-level */
@@ -1608,9 +1608,9 @@ More explicit license information at the end of file.
 					mum_global_context = (mumContext*)mu_malloc(sizeof(mumContext));
 					MU_ASSERT(mum_global_context != 0, result, MUM_ALLOCATION_FAILED, return;)
 
-					MU_GTHREADS = MU_ZERO_STRUCT(mu_win32_thread_array);
-					MU_GMUTEXES = MU_ZERO_STRUCT(mu_win32_mutex_array);
-					MU_GSPINLOCKS = MU_ZERO_STRUCT(mu_win32_spinlock_array);
+					MUM_GTHREADS = MU_ZERO_STRUCT(mu_win32_thread_array);
+					MUM_GMUTEXES = MU_ZERO_STRUCT(mu_win32_mutex_array);
+					MUM_GSPINLOCKS = MU_ZERO_STRUCT(mu_win32_spinlock_array);
 				}
 
 				MUDEF void mum_term(mumResult* result) {
@@ -1618,20 +1618,20 @@ More explicit license information at the end of file.
 
 					MU_ASSERT(mum_global_context != MU_NULL_PTR, result, MUM_ALREADY_TERMINATED, return;)
 
-					for (size_m i = 0; i < MU_GTHREADS.length; i++) {
+					for (size_m i = 0; i < MUM_GTHREADS.length; i++) {
 						mu_thread_destroy(0, i);
 					}
-					mu_win32_thread_destroy(0, &MU_GTHREADS);
+					mu_win32_thread_destroy(0, &MUM_GTHREADS);
 
-					for (size_m i = 0; i < MU_GMUTEXES.length; i++) {
+					for (size_m i = 0; i < MUM_GMUTEXES.length; i++) {
 						mu_mutex_destroy(0, i);
 					}
-					mu_win32_mutex_destroy(0, &MU_GMUTEXES);
+					mu_win32_mutex_destroy(0, &MUM_GMUTEXES);
 
-					for (size_m i = 0; i < MU_GSPINLOCKS.length; i++) {
+					for (size_m i = 0; i < MUM_GSPINLOCKS.length; i++) {
 						mu_spinlock_destroy(0, i);
 					}
-					mu_win32_spinlock_destroy(0, &MU_GSPINLOCKS);
+					mu_win32_spinlock_destroy(0, &MUM_GSPINLOCKS);
 
 					mu_free(mum_global_context);
 					mum_global_context = MU_NULL_PTR;
@@ -1648,37 +1648,37 @@ More explicit license information at the end of file.
 
 					size_m thread = MU_NONE;
 					mumaResult muma_res = MUMA_SUCCESS;
-					mu_win32_thread_find_push(&muma_res, &MU_GTHREADS, MU_ZERO_STRUCT(mu_win32_thread), &thread);
+					mu_win32_thread_find_push(&muma_res, &MUM_GTHREADS, MU_ZERO_STRUCT(mu_win32_thread), &thread);
 					MU_ASSERT(muma_res == MUMA_SUCCESS && thread != MU_NONE, result, muma_result_to_mum_result(muma_res), 
 						return MU_NONE;
 					)
 
-					mu_win32_thread_hold_element(0, &MU_GTHREADS, thread);
+					mu_win32_thread_hold_element(0, &MUM_GTHREADS, thread);
 					LPTHREAD_START_ROUTINE lp_start;
 					mu_memcpy(&lp_start, &start, sizeof(void*));
 					DWORD id;
-					MU_GTHREADS.data[thread].handle = CreateThread(0, 0, lp_start, args, 0, &id);
-					if (MU_GTHREADS.data[thread].handle == 0) {
-						MU_RELEASE(MU_GTHREADS, thread, mu_win32_thread_);
+					MUM_GTHREADS.data[thread].handle = CreateThread(0, 0, lp_start, args, 0, &id);
+					if (MUM_GTHREADS.data[thread].handle == 0) {
+						MU_RELEASE(MUM_GTHREADS, thread, mu_win32_thread_);
 						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
 						return MU_NONE;
 					}
 
-					MU_GTHREADS.data[thread].active = MU_TRUE;
-					MU_RELEASE(MU_GTHREADS, thread, mu_win32_thread_)
+					MUM_GTHREADS.data[thread].active = MU_TRUE;
+					MU_RELEASE(MUM_GTHREADS, thread, mu_win32_thread_)
 					return thread;
 				}
 
 				MUDEF muThread mu_thread_destroy(mumResult* result, muThread thread) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return thread;)
-					MU_HOLD(result, thread, MU_GTHREADS, mum_global_context, MUM_, return thread;, mu_win32_thread_)
+					MU_HOLD(result, thread, MUM_GTHREADS, mum_global_context, MUM_, return thread;, mu_win32_thread_)
 
-					MU_ASSERT(CloseHandle(MU_GTHREADS.data[thread].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
-						MU_RELEASE(MU_GTHREADS, thread, mu_win32_thread_) return thread;
+					MU_ASSERT(CloseHandle(MUM_GTHREADS.data[thread].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
+						MU_RELEASE(MUM_GTHREADS, thread, mu_win32_thread_) return thread;
 					)
-					MU_GTHREADS.data[thread].active = MU_FALSE;
+					MUM_GTHREADS.data[thread].active = MU_FALSE;
 
-					MU_RELEASE(MU_GTHREADS, thread, mu_win32_thread_)
+					MU_RELEASE(MUM_GTHREADS, thread, mu_win32_thread_)
 					return MU_NONE;
 				}
 
@@ -1690,9 +1690,9 @@ More explicit license information at the end of file.
 
 				MUDEF void mu_thread_wait(mumResult* result, muThread thread) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, thread, MU_GTHREADS, mum_global_context, MUM_, return;, mu_win32_thread_)
+					MU_HOLD(result, thread, MUM_GTHREADS, mum_global_context, MUM_, return;, mu_win32_thread_)
 
-					DWORD wait_result = WaitForSingleObject(MU_GTHREADS.data[thread].handle, INFINITE);
+					DWORD wait_result = WaitForSingleObject(MUM_GTHREADS.data[thread].handle, INFINITE);
 
 					switch (wait_result) {
 						case WAIT_TIMEOUT: {
@@ -1704,22 +1704,22 @@ More explicit license information at the end of file.
 						} break;
 					}
 
-					MU_RELEASE(MU_GTHREADS, thread, mu_win32_thread_)
+					MU_RELEASE(MUM_GTHREADS, thread, mu_win32_thread_)
 				}
 
 				MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return MU_NULL_PTR;)
-					MU_HOLD(result, thread, MU_GTHREADS, mum_global_context, MUM_, return MU_NULL_PTR;, mu_win32_thread_)
+					MU_HOLD(result, thread, MUM_GTHREADS, mum_global_context, MUM_, return MU_NULL_PTR;, mu_win32_thread_)
 
 					DWORD exit_code = 0;
-					MU_ASSERT(GetExitCodeThread(MU_GTHREADS.data[thread].handle, &exit_code) != 0, result, MUM_GET_RETURN_VALUE_CALL_FAILED, 
-						MU_RELEASE(MU_GTHREADS, thread, mu_win32_thread_) return MU_NULL_PTR;
+					MU_ASSERT(GetExitCodeThread(MUM_GTHREADS.data[thread].handle, &exit_code) != 0, result, MUM_GET_RETURN_VALUE_CALL_FAILED, 
+						MU_RELEASE(MUM_GTHREADS, thread, mu_win32_thread_) return MU_NULL_PTR;
 					)
 
 					void* p;
 					mu_memcpy(&p, &exit_code, sizeof(DWORD));
 
-					MU_RELEASE(MU_GTHREADS, thread, mu_win32_thread_)
+					MU_RELEASE(MUM_GTHREADS, thread, mu_win32_thread_)
 					return p;
 				}
 
@@ -1733,42 +1733,42 @@ More explicit license information at the end of file.
 
 					size_m mutex = MU_NONE;
 					mumaResult muma_res = MUMA_SUCCESS;
-					mu_win32_mutex_find_push(&muma_res, &MU_GMUTEXES, MU_ZERO_STRUCT(mu_win32_mutex), &mutex);
+					mu_win32_mutex_find_push(&muma_res, &MUM_GMUTEXES, MU_ZERO_STRUCT(mu_win32_mutex), &mutex);
 					MU_ASSERT(muma_res == MUMA_SUCCESS && mutex != MU_NONE, result, muma_result_to_mum_result(muma_res),
 						return MU_NONE;
 					)
 
-					mu_win32_mutex_hold_element(0, &MU_GMUTEXES, mutex);
-					MU_GMUTEXES.data[mutex].handle = CreateMutex(0, MU_FALSE, 0);
-					if (MU_GMUTEXES.data[mutex].handle == 0) {
-						MU_RELEASE(MU_GMUTEXES, mutex, mu_win32_mutex_)
+					mu_win32_mutex_hold_element(0, &MUM_GMUTEXES, mutex);
+					MUM_GMUTEXES.data[mutex].handle = CreateMutex(0, MU_FALSE, 0);
+					if (MUM_GMUTEXES.data[mutex].handle == 0) {
+						MU_RELEASE(MUM_GMUTEXES, mutex, mu_win32_mutex_)
 						MU_SET_RESULT(result, MUM_CREATE_CALL_FAILED)
 						return MU_NONE;
 					}
 
-					MU_GMUTEXES.data[mutex].active = MU_TRUE;
-					MU_RELEASE(MU_GMUTEXES, mutex, mu_win32_mutex_)
+					MUM_GMUTEXES.data[mutex].active = MU_TRUE;
+					MU_RELEASE(MUM_GMUTEXES, mutex, mu_win32_mutex_)
 					return mutex;
 				}
 
 				MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return mutex;)
-					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return mutex;, mu_win32_mutex_)
+					MU_HOLD(result, mutex, MUM_GMUTEXES, mum_global_context, MUM_, return mutex;, mu_win32_mutex_)
 
-					MU_ASSERT(CloseHandle(MU_GMUTEXES.data[mutex].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
-						MU_RELEASE(MU_GMUTEXES, mutex, mu_win32_mutex_) return mutex;
+					MU_ASSERT(CloseHandle(MUM_GMUTEXES.data[mutex].handle) == 0, result, MUM_DESTROY_CALL_FAILED, 
+						MU_RELEASE(MUM_GMUTEXES, mutex, mu_win32_mutex_) return mutex;
 					)
-					MU_GMUTEXES.data[mutex].active = MU_FALSE;
-					MU_RELEASE(MU_GMUTEXES, mutex, mu_win32_mutex_)
+					MUM_GMUTEXES.data[mutex].active = MU_FALSE;
+					MU_RELEASE(MUM_GMUTEXES, mutex, mu_win32_mutex_)
 					return MU_NONE;
 				}
 
 				MUDEF void mu_mutex_lock(mumResult* result, muMutex mutex) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return;, mu_win32_mutex_)
+					MU_HOLD(result, mutex, MUM_GMUTEXES, mum_global_context, MUM_, return;, mu_win32_mutex_)
 
-					MU_RELEASE(MU_GMUTEXES, mutex, mu_win32_mutex_)
-					DWORD wait_result = WaitForSingleObject(MU_GMUTEXES.data[mutex].handle, INFINITE);
+					MU_RELEASE(MUM_GMUTEXES, mutex, mu_win32_mutex_)
+					DWORD wait_result = WaitForSingleObject(MUM_GMUTEXES.data[mutex].handle, INFINITE);
 
 					switch (wait_result) {
 						// The mutex has most likely been closed. This should pretty much never happen with
@@ -1796,12 +1796,12 @@ More explicit license information at the end of file.
 
 				MUDEF void mu_mutex_unlock(mumResult* result, muMutex mutex) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, mutex, MU_GMUTEXES, mum_global_context, MUM_, return;, mu_win32_mutex_)
+					MU_HOLD(result, mutex, MUM_GMUTEXES, mum_global_context, MUM_, return;, mu_win32_mutex_)
 
-					MU_ASSERT(ReleaseMutex(MU_GMUTEXES.data[mutex].handle), result, MUM_UNLOCK_CALL_FAILED, 
-						MU_RELEASE(MU_GMUTEXES, mutex, mu_win32_mutex_) return;
+					MU_ASSERT(ReleaseMutex(MUM_GMUTEXES.data[mutex].handle), result, MUM_UNLOCK_CALL_FAILED, 
+						MU_RELEASE(MUM_GMUTEXES, mutex, mu_win32_mutex_) return;
 					)
-					MU_RELEASE(MU_GMUTEXES, mutex, mu_win32_mutex_)
+					MU_RELEASE(MUM_GMUTEXES, mutex, mu_win32_mutex_)
 				}
 
 		/* Spinlocks */
@@ -1814,43 +1814,43 @@ More explicit license information at the end of file.
 
 					size_m spinlock = MU_NONE;
 					mumaResult muma_res = MUMA_SUCCESS;
-					mu_win32_spinlock_find_push(&muma_res, &MU_GSPINLOCKS, MU_ZERO_STRUCT(mu_win32_spinlock), &spinlock);
+					mu_win32_spinlock_find_push(&muma_res, &MUM_GSPINLOCKS, MU_ZERO_STRUCT(mu_win32_spinlock), &spinlock);
 					MU_ASSERT(muma_res == MUMA_SUCCESS && spinlock != MU_NONE, result, muma_result_to_mum_result(muma_res),
 						return MU_NONE;
 					)
 
-					mu_win32_spinlock_hold_element(0, &MU_GSPINLOCKS, spinlock);
-					MU_GSPINLOCKS.data[spinlock].locked = 0;
+					mu_win32_spinlock_hold_element(0, &MUM_GSPINLOCKS, spinlock);
+					MUM_GSPINLOCKS.data[spinlock].locked = 0;
 
-					MU_GSPINLOCKS.data[spinlock].active = MU_TRUE;
-					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_win32_spinlock_)
+					MUM_GSPINLOCKS.data[spinlock].active = MU_TRUE;
+					MU_RELEASE(MUM_GSPINLOCKS, spinlock, mu_win32_spinlock_)
 					return spinlock;
 				}
 
 				MUDEF muSpinlock mu_spinlock_destroy(mumResult* result, muSpinlock spinlock) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return spinlock;)
-					MU_HOLD(result, spinlock, MU_GSPINLOCKS, mum_global_context, MUM_, return spinlock;, mu_win32_spinlock_)
+					MU_HOLD(result, spinlock, MUM_GSPINLOCKS, mum_global_context, MUM_, return spinlock;, mu_win32_spinlock_)
 
-					MU_GSPINLOCKS.data[spinlock].locked = 0;
-					MU_GSPINLOCKS.data[spinlock].active = MU_FALSE;
-					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_win32_spinlock_)
+					MUM_GSPINLOCKS.data[spinlock].locked = 0;
+					MUM_GSPINLOCKS.data[spinlock].active = MU_FALSE;
+					MU_RELEASE(MUM_GSPINLOCKS, spinlock, mu_win32_spinlock_)
 					return MU_NONE;
 				}
 
 				MUDEF void mu_spinlock_lock(mumResult* result, muSpinlock spinlock) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, spinlock, MU_GSPINLOCKS, mum_global_context, MUM_, return;, mu_win32_spinlock_)
+					MU_HOLD(result, spinlock, MUM_GSPINLOCKS, mum_global_context, MUM_, return;, mu_win32_spinlock_)
 
-					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_win32_spinlock_)
-					while (!mum_atomic_compare_exchange(&MU_GSPINLOCKS.data[spinlock].locked, 0, 1)) {}
+					MU_RELEASE(MUM_GSPINLOCKS, spinlock, mu_win32_spinlock_)
+					while (!mum_atomic_compare_exchange(&MUM_GSPINLOCKS.data[spinlock].locked, 0, 1)) {}
 				}
 
 				MUDEF void mu_spinlock_unlock(mumResult* result, muSpinlock spinlock) {
 					MU_SAFEFUNC(result, MUM_, mum_global_context, return;)
-					MU_HOLD(result, spinlock, MU_GSPINLOCKS, mum_global_context, MUM_, return;, mu_win32_spinlock_)
+					MU_HOLD(result, spinlock, MUM_GSPINLOCKS, mum_global_context, MUM_, return;, mu_win32_spinlock_)
 
-					mum_atomic_store(&MU_GSPINLOCKS.data[spinlock].locked, 0);
-					MU_RELEASE(MU_GSPINLOCKS, spinlock, mu_win32_spinlock_)
+					mum_atomic_store(&MUM_GSPINLOCKS.data[spinlock].locked, 0);
+					MU_RELEASE(MUM_GSPINLOCKS, spinlock, mu_win32_spinlock_)
 				}
 
 	#endif /* MU_WIN32 */
