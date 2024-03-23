@@ -11,7 +11,7 @@ More explicit license information at the end of file.
 @MENTION mu_thread_wait has to be called to get return value
 */
 
-/* muu header commit a87a759 */
+/* muu header commit 96a78ce */
 
 #ifndef MUU_H
 	#define MUU_H
@@ -29,6 +29,85 @@ More explicit license information at the end of file.
 	#define MUU_VERSION_PATCH 0
 
 	/* C standard library dependencies */
+
+		#if !defined(int8_m)   || \
+			!defined(uint8_m)  || \
+			!defined(int16_m)  || \
+			!defined(uint16_m) || \
+			!defined(int32_m)  || \
+			!defined(uint32_m) || \
+			!defined(int64_m)  || \
+			!defined(uint64_m)
+
+			#define __STDC_LIMIT_MACROS
+			#define __STDC_CONSTANT_MACROS
+			#include <stdint.h>
+
+			#ifndef int8_m
+				#ifdef INT8_MAX
+					#define int8_m int8_t
+				#else
+					#define int8_m char
+				#endif
+			#endif
+
+			#ifndef uint8_m
+				#ifdef UINT8_MAX
+					#define uint8_m uint8_t
+				#else
+					#define uint8_m unsigned char
+				#endif
+			#endif
+
+			#ifndef int16_m
+				#ifdef INT16_MAX
+					#define int16_m int16_t
+				#else
+					#define int16_m short
+				#endif
+			#endif
+
+			#ifndef uint16_m
+				#ifdef UINT16_MAX
+					#define uint16_m uint16_t
+				#else
+					#define uint16_m unsigned short
+				#endif
+			#endif
+
+			#ifndef int32_m
+				#ifdef INT32_MAX
+					#define int32_m int32_t
+				#else
+					#define int32_m long
+				#endif
+			#endif
+
+			#ifndef uint32_m
+				#ifdef UINT32_MAX
+					#define uint32_m uint32_t
+				#else
+					#define uint32_m unsigned long
+				#endif
+			#endif
+
+			#ifndef int64_m
+				#ifdef INT64_MAX
+					#define int64_m int64_t
+				#else
+					#define int64_m long long
+				#endif
+			#endif
+
+			#ifndef uint64_m
+				#ifdef UINT64_MAX
+					#define uint64_m uint64_t
+				#else
+					#define uint64_m unsigned long long
+				#endif
+			#endif
+
+		#endif
 
 		#if !defined(size_m)
 
@@ -1043,33 +1122,37 @@ More explicit license information at the end of file.
 
 	/* muma implementation (commit 4683cd1) */
 
-	#define MUMA_IMPLEMENTATION
+	#ifndef MUMA_IMPLEMENTATION
 
-	#ifdef MUMA_IMPLEMENTATION
+		#define MUMA_IMPLEMENTATION
 
-		#ifdef __cplusplus
-			extern "C" {
-		#endif
+		#ifdef MUMA_IMPLEMENTATION
 
-		#ifdef MUMA_NAMES
-			MUDEF const char* muma_result_get_name(mumaResult result) {
-				switch (result) {
-					default: return "MUMA_UNKNOWN"; break;
-					case MUMA_SUCCESS: return "MUMA_SUCCESS"; break;
-					case MUMA_FAILED_TO_ALLOCATE: return "MUMA_FAILED_TO_ALLOCATE"; break;
-					case MUMA_INVALID_TYPE_SIZE: return "MUMA_INVALID_TYPE_SIZE"; break;
-					case MUMA_INVALID_INDEX: return "MUMA_INVALID_INDEX"; break;
-					case MUMA_INVALID_SHIFT_AMOUNT: return "MUMA_INVALID_SHIFT_AMOUNT"; break;
-					case MUMA_INVALID_COUNT: return "MUMA_INVALID_COUNT"; break;
+			#ifdef __cplusplus
+				extern "C" {
+			#endif
+
+			#ifdef MUMA_NAMES
+				MUDEF const char* muma_result_get_name(mumaResult result) {
+					switch (result) {
+						default: return "MUMA_UNKNOWN"; break;
+						case MUMA_SUCCESS: return "MUMA_SUCCESS"; break;
+						case MUMA_FAILED_TO_ALLOCATE: return "MUMA_FAILED_TO_ALLOCATE"; break;
+						case MUMA_INVALID_TYPE_SIZE: return "MUMA_INVALID_TYPE_SIZE"; break;
+						case MUMA_INVALID_INDEX: return "MUMA_INVALID_INDEX"; break;
+						case MUMA_INVALID_SHIFT_AMOUNT: return "MUMA_INVALID_SHIFT_AMOUNT"; break;
+						case MUMA_INVALID_COUNT: return "MUMA_INVALID_COUNT"; break;
+					}
 				}
-			}
-		#endif
+			#endif
 
-		#ifdef __cplusplus
-			}
-		#endif
+			#ifdef __cplusplus
+				}
+			#endif
 
-	#endif /* MUMA_IMPLEMENTATION */
+		#endif /* MUMA_IMPLEMENTATION */
+
+	#endif
 
 	#ifdef __cplusplus
 	extern "C" { // }
