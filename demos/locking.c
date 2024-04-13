@@ -50,7 +50,7 @@ int counter = 0;
 muLock lock = MU_NONE;
 
 // Note: any thread function has to have this return type and parameters
-void test(void* args) {
+void thread_func(void* args) {
 	// Read from the args pointer to get our thread ID
 	size_m id = *(size_m*)args;
 
@@ -105,7 +105,7 @@ int main(void) {
 	// Create our threads with a loop
 
 	for (size_m i = 0; i < 2; i++) {
-		threads[i] = mu_thread_create(&result, test, &thread_ids[i]);
+		threads[i] = mu_thread_create(&result, thread_func, &thread_ids[i]);
 		if (result != MUM_SUCCESS)
 			printf("WARNING: mu_thread_create returned %s\n", mum_result_get_name(result));
 	}
