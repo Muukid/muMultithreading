@@ -1176,7 +1176,6 @@ More explicit license information at the end of file.
 
 			MUDEF void mu_mutex_lock(mumResult* result, muMutex mutex);
 			MUDEF void mu_mutex_unlock(mumResult* result, muMutex mutex);
-			MUDEF muBool mu_mutex_is_locked(mumResult* result, muMutex mutex);
 
 		/* Spinlock */
 
@@ -1185,7 +1184,6 @@ More explicit license information at the end of file.
 
 			MUDEF void mu_spinlock_lock(mumResult* result, muSpinlock spinlock);
 			MUDEF void mu_spinlock_unlock(mumResult* result, muSpinlock spinlock);
-			MUDEF muBool mu_spinlock_is_locked(mumResult* result, muSpinlock spinlock);
 
 	#ifdef __cplusplus
 	}
