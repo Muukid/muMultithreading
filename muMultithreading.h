@@ -1307,7 +1307,7 @@ More explicit license information at the end of file.
 
 			#ifdef MU_THREADSAFE
 
-				#define MU_LOCK pthread_mutex_t
+				#define MU_LOCK pthread_mutex_t lock; muBool lock_active;
 
 				#define MU_LOCK_CREATE(lock, lock_active) \
 					if (pthread_mutex_init(&lock, 0) == 0) { \
@@ -1335,6 +1335,7 @@ More explicit license information at the end of file.
 
 			#else
 
+				#define MU_LOCK
 				#define MU_LOCK_CREATE(lock, active)
 				#define MU_LOCK_DESTROY(lock, active)
 				#define MU_LOCK_LOCK(lock, active)
@@ -1351,10 +1352,7 @@ More explicit license information at the end of file.
 					pthread_t handle;
 					void* ret;
 
-					#ifdef MU_THREADSAFE
-					muBool lock_active;
-					MU_LOCK lock;
-					#endif
+					MU_LOCK
 				};
 				typedef struct mu_unix_thread mu_unix_thread;
 
@@ -1366,10 +1364,7 @@ More explicit license information at the end of file.
 					muBool active;
 					pthread_mutex_t handle;
 
-					#ifdef MU_THREADSAFE
-					muBool lock_active;
-					MU_LOCK lock;
-					#endif
+					MU_LOCK
 				};
 				typedef struct mu_unix_mutex mu_unix_mutex;
 
@@ -1381,10 +1376,7 @@ More explicit license information at the end of file.
 					muBool active;
 					int locked;
 
-					#ifdef MU_THREADSAFE
-					muBool lock_active;
-					MU_LOCK lock;
-					#endif
+					MU_LOCK
 				};
 				typedef struct mu_unix_spinlock mu_unix_spinlock;
 
@@ -1664,7 +1656,7 @@ More explicit license information at the end of file.
 
 			#ifdef MU_THREADSAFE
 
-				#define MU_LOCK HANDLE
+				#define MU_LOCK HANDLE lock; muBool lock_active;
 
 				#define MU_LOCK_CREATE(lock, lock_active) \
 					lock = CreateMutex(0, MU_FALSE, 0); \
@@ -1693,6 +1685,7 @@ More explicit license information at the end of file.
 
 			#else
 
+				#define MU_LOCK
 				#define MU_LOCK_CREATE(lock, active)
 				#define MU_LOCK_DESTROY(lock, active)
 				#define MU_LOCK_LOCK(lock, active)
@@ -1708,10 +1701,7 @@ More explicit license information at the end of file.
 					muBool active;
 					HANDLE handle;
 
-					#ifdef MU_THREADSAFE
-					muBool lock_active;
-					MU_LOCK lock;
-					#endif
+					MU_LOCK
 				};
 				typedef struct mu_win32_thread mu_win32_thread;
 
@@ -1723,10 +1713,7 @@ More explicit license information at the end of file.
 					muBool active;
 					HANDLE handle;
 
-					#ifdef MU_THREADSAFE
-					muBool lock_active;
-					MU_LOCK lock;
-					#endif
+					MU_LOCK
 				};
 				typedef struct mu_win32_mutex mu_win32_mutex;
 
@@ -1738,10 +1725,7 @@ More explicit license information at the end of file.
 					muBool active;
 					LONG volatile locked;
 
-					#ifdef MU_THREADSAFE
-					muBool lock_active;
-					MU_LOCK lock;
-					#endif
+					MU_LOCK
 				};
 				typedef struct mu_win32_spinlock mu_win32_spinlock;
 
