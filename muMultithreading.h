@@ -7,9 +7,48 @@ Licensed under MIT License or public domain, whichever you prefer.
 More explicit license information at the end of file.
 */
 
+/* @DOCBEGIN
+# muMultithreading v2.0.0
+
+muMultithreading (acrynomized to mum) is a public domain header-only single-file C library for cross-platform multithreading. To use it, download the `muMultithreading.h` file, add it to your include path, and include it like so:
+
+```c
+#define MUM_IMPLEMENTATION
+#include "muMultithreading.h"
+```
+
+More information about the general structure of a mu library is provided at [the mu library information GitHub repository.](https://github.com/Muukid/mu-library-information)
+
+# Demos
+
+Demos that quickly show the gist of the library and how it works are available in the `demos` folder.
+
+# Licensing
+
+mum is licensed under public domain or MIT, whichever you prefer. More information is provided in the accompanying file `license.md` and at the bottom of `muMultithreading.h`.
+
+# Other library dependencies
+
+mum has a dependency on:
+
+[muUtility commit 2b34ba6](https://github.com/Muukid/muUtility/#diff-ce63462d8fced3767ed5df21ba8a9476337e51ee1ba9fa2d5a116e14f87571e2)
+
+Note that mu libraries store their dependencies within their files, so you don't need to import these dependencies yourself.
+
+Note that the libraries listed may also have other dependencies that they also include that aren't listed here.
+
+# System dependencies
+
+muMultithreading is built for POSIX and Win32.
+
+For POSIX, in particular, pthreads is needed. This means that pthread needs to be linked to, usually with `-pthread`.
+
+@DOCEND */
+
 #ifndef MUM_H
 	#define MUM_H
-
+	
+	// @IGNORE
 	/* muUtility commit 2b34ba6 header */
 	
 		#if !defined(MU_CHECK_VERSION_MISMATCHING) && defined(MUU_H) && \
@@ -271,26 +310,28 @@ More explicit license information at the end of file.
 			#endif
 
 		#endif /* MUU_H */
-	
+	// @ATTENTION
+
 	#ifdef __cplusplus
 	extern "C" { // }
 	#endif
 
-	#define MUM_VERSION_MAJOR 1
-	#define MUM_VERSION_MINOR 0
-	#define MUM_VERSION_PATCH 0
+	// @DOCLINE # C standard library dependencies
 
-	/* C standard library dependencies */
+		// @DOCLINE mum has several C standard library dependencies not provided by its other library dependencies, all of which are overridable by defining them before MUM_H is defined. The following is a list of those dependencies. Note that defining all of the dependencies of a C standard library file prevents it from being included.
 
 		#if !defined(mu_malloc) || \
 			!defined(mu_free)
 
+			// @DOCLINE ## `stdlib.h` dependencies
 			#include <stdlib.h>
 
+			// @DOCLINE `mu_malloc`: equivalent to malloc.
 			#ifndef mu_malloc
 				#define mu_malloc malloc
 			#endif
 
+			// @DOCLINE `mu_free`: equivalent to free.
 			#ifndef mu_free
 				#define mu_free free
 			#endif
@@ -299,101 +340,200 @@ More explicit license information at the end of file.
 
 		#if !defined(mu_memcpy)
 
+			// @DOCLINE ## `string.h` dependencies
 			#include <string.h>
 
+			// @DOCLINE `mu_memcpy`: equivalent to memcpy.
 			#ifndef mu_memcpy
 				#define mu_memcpy memcpy
 			#endif
 
 		#endif
 
-	/* Enums */
+	// @DOCLINE # Enumerators
 
 		MU_ENUM(mumResult,
+			/* @DOCBEGIN
+			## Result enumerator
+			
+			mum uses the `mumResult` enumerator to represent how a function went. It has the following possible values.
+
+			@DOCEND */
+
+			// @DOCLINE ### General result enumerators
+
+			// @DOCLINE `@NLFT`: the task succeeded.
 			MUM_SUCCESS,
 
+			// @DOCLINE `@NLFT`: memory necessary to complete the task failed to allocate.
 			MUM_FAILED_ALLOCATE,
 
-			// Win32
+			// @DOCLINE ### Win32-specific result enumerators
+
+			// @DOCLINE `@NLFT`: a call to `CreateThread` failed, and the thread has not been created.
 			MUM_FAILED_CREATE_THREAD,
+			// @DOCLINE `@NLFT`: a call to `CloseHandle` failed, and the object has not been destroyed.
 			MUM_FAILED_CLOSE_HANDLE,
+			// @DOCLINE `@NLFT`: a call to `GetExitCodeThread` failed, and the return value could not be retrieved.
 			MUM_FAILED_GET_EXIT_CODE_THREAD,
+			// @DOCLINE `@NLFT`: a call to `WaitForSingleObject` returned `WAIT_TIMEOUT`, and the thread has been reset.
 			MUM_THREAD_WAIT_TIMEOUT,
+			// @DOCLINE `@NLFT`: a call to `WaitForSingleObject` returned `WAIT_FAILED`, and the thread's state is unknown.
 			MUM_THREAD_WAIT_FAILED,
+			// @DOCLINE `@NLFT`: a call to `CreateMutex` failed, and the mutex has not been created.
 			MUM_FAILED_CREATE_MUTEX,
+			// @DOCLINE `@NLFT`: a call to `WaitForSingleObject` returned `WAIT_FAILED`, most likley implying that the mutex has been closed whilst waiting.
 			MUM_MUTEX_WAIT_FAILED,
+			// @DOCLINE `@NLFT`: a call to `WaitForSingleObject` returned `WAIT_ABANDONED`, meaning that the thread holding the mutex has closed before unlocking it; the mutex is unlocked; see [this](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject).
 			MUM_MUTEX_WAIT_ABANDONED,
+			// @DOCLINE `@NLFT`: a call to `ReleaseMutex` failed; the thread that called this function does not have it locked.
 			MUM_FAILED_RELEASE_MUTEX,
 
-			// Unix
+			// @DOCLINE ### Unix-specific result enumerators
+
+			// @DOCLINE `@NLFT`: a call to `pthread_create` failed, and the thread has not been created.
 			MUM_FAILED_PTHREAD_CREATE,
+			// @DOCLINE `@NLFT`: a call to `pthread_cancel` failed, and the thread has not been destroyed.
 			MUM_FAILED_PTHREAD_CANCEL,
+			// @DOCLINE `@NLFT`: a call to `pthread_join` failed.
 			MUM_FAILED_PTHREAD_JOIN,
+			// @DOCLINE `@NLFT`: a call to `pthread_mutex_init` failed, and the mutex has not been created.
 			MUM_FAILED_PTHREAD_MUTEX_INIT,
+			// @DOCLINE `@NLFT`: a call to `pthread_mutex_destroy` failed, and the mutex has not been destroyed.
 			MUM_FAILED_PTHREAD_MUTEX_DESTROY,
+			// @DOCLINE `@NLFT`: a call to `pthread_mutex_lock` failed, and the mutex has not been locked.
 			MUM_FAILED_PTHREAD_MUTEX_LOCK,
+			// @DOCLINE `@NLFT`: a call to `pthread_mutex_unlock` failed, and the mutex has not been unlocked.
 			MUM_FAILED_PTHREAD_MUTEX_UNLOCK,
 		)
 
-	/* Macros */
+	// @DOCLINE # Macros
 
-		#define muThread void*
-		#define muMutex void*
-		#define muSpinlock void*
+		// @DOCLINE ## Object macros
 
-	/* Functions */
+			// @DOCLINE There are several macros used to represent an object, which are all macros for the type `void*`. These are:
 
-		MUDEF void mum_global_result(mumResult* result);
+			// @DOCLINE `muThread`: a [thread](https://en.wikipedia.org/wiki/Thread_(computing)).
+			#define muThread void*
+			// @DOCLINE `muMutex`: a [mutex](https://en.wikipedia.org/wiki/Lock_(computer_science)).
+			#define muMutex void*
+			// @DOCLINE `muSpinlock`: a [spinlock](https://en.wikipedia.org/wiki/Spinlock).
+			#define muSpinlock void*
 
-		/* Names */
+		// @DOCLINE ## Version macros
+
+			// @DOCLINE There are three major, minor, and patch macros respectively defined to represent the version of mum, defined as `MUM_VERSION_MAJOR`, `MUM_VERSION_MINOR`, and `MUM_VERSION_PATCH`, following the formatting of `vMAJOR.MINOR.PATCH`.
+
+			#define MUM_VERSION_MAJOR 2
+			#define MUM_VERSION_MINOR 0
+			#define MUM_VERSION_PATCH 0
+
+	// @DOCLINE # Functions
+
+		// @DOCLINE ## Global result
+
+			// @DOCLINE ### Global result
+			// @DOCLINE The function `mum_global_result` sets the global result pointer assumed by all non-result-checking functions to the given value, defined below: @NLNT
+			MUDEF void mum_global_result(mumResult* result);
+			// @DOCLINE Note that the assumed global result pointer is 0, and can be safely left as this or later set to this via this function to not check the result of functions.
+
+		// @DOCLINE ## Names
+
+			// @DOCLINE All the functions within this section are not defined unless `MUM_NAMES` was defined before mum was included.
 
 			#ifdef MUM_NAMES
+				// @DOCLINE ### Get name of result
+				// @DOCLINE The function `mum_result_get_name` returns a `const char*` representation of the given result enum value, defined below: @NLNT
 				MUDEF const char* mum_result_get_name(mumResult result);
 			#endif
 
-		/* Thread */
+		// @DOCLINE ## Thread functions
 
-			MUDEF muThread mu_thread_create_(mumResult* result, void (*start)(void* args), void* args);
-			MUDEF muThread mu_thread_create(void (*start)(void* args), void* args);
+			// @DOCLINE ### Thread creation and destruction
 
-			MUDEF muThread mu_thread_destroy_(mumResult* result, muThread thread);
-			MUDEF muThread mu_thread_destroy(muThread thread);
+				// @DOCLINE The function `mu_thread_create` creates a thread, defined below: @NLNT
+				MUDEF muThread mu_thread_create(void (*start)(void* args), void* args);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF muThread mu_thread_create_(mumResult* result, void (*start)(void* args), void* args);
+				// @DOCLINE Note that there is a delay between thread creation being called and the thread's execution beginning. This means that, for example, if multiple threads are created in sequence, the order of the given threads beginning execution cannot be guaranteed.
 
-			MUDEF void mu_thread_exit(void* ret);
+				// @DOCLINE The function `mu_thread_destroy` destroys a thread, defined below: @NLNT
+				MUDEF muThread mu_thread_destroy(muThread thread);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF muThread mu_thread_destroy_(mumResult* result, muThread thread);
 
-			MUDEF void mu_thread_wait_(mumResult* result, muThread thread);
-			MUDEF void mu_thread_wait(muThread thread);
+			// @DOCLINE ### Thread exiting
 
-			MUDEF void* mu_thread_get_return_value_(mumResult* result, muThread thread);
-			MUDEF void* mu_thread_get_return_value(muThread thread);
+				// @DOCLINE The function `mu_thread_exit` exits from the current thread with a return value, defined below: @NLNT
+				MUDEF void mu_thread_exit(void* ret);
+				// @DOCLINE This function is meant to be called from within a thread, and is expected to be called at *some* point during the thread's lifetime; if this function is not called during a created thread's lifetime, resulting behaviour is undefined.
 
-		/* Mutex */
+			// @DOCLINE ### Thread waiting
 
-			MUDEF muMutex mu_mutex_create_(mumResult* result);
-			MUDEF muMutex mu_mutex_create(void);
+				// @DOCLINE The function `mu_thread_wait` waits on a thread to finish executing, defined below: @NLNT
+				MUDEF void mu_thread_wait(muThread thread);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF void mu_thread_wait_(mumResult* result, muThread thread);
 
-			MUDEF muMutex mu_mutex_destroy_(mumResult* result, muMutex mutex);
-			MUDEF muMutex mu_mutex_destroy(muMutex mutex);
+			// @DOCLINE ### Retrieving thread return value
 
-			MUDEF void mu_mutex_lock_(mumResult* result, muMutex mutex);
-			MUDEF void mu_mutex_lock(muMutex mutex);
+				// @DOCLINE The function `mu_thread_get_return_value` retrieves the value passed to `mu_thread_exit` by a thread, defined below: @NLNT
+				MUDEF void* mu_thread_get_return_value(muThread thread);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF void* mu_thread_get_return_value_(mumResult* result, muThread thread);
+				// @DOCLINE This function may not perform correctly unless `mu_thread_wait` has been called for the given thread beforehand, even if it can be guaranteed that the thread will have already been finished by now.
 
-			MUDEF void mu_mutex_unlock_(mumResult* result, muMutex mutex);
-			MUDEF void mu_mutex_unlock(muMutex mutex);
+		// @DOCLINE ## Mutex functions
 
-		/* Spinlock */
+			// @DOCLINE ### Mutex creation and destruction
 
-			MUDEF muSpinlock mu_spinlock_create_(mumResult* result);
-			MUDEF muSpinlock mu_spinlock_create(void);
+				// @DOCLINE The function `mu_mutex_create` creates a mutex, defined below: @NLNT
+				MUDEF muMutex mu_mutex_create(void);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF muMutex mu_mutex_create_(mumResult* result);
 
-			MUDEF muSpinlock mu_spinlock_destroy_(mumResult* result, muSpinlock spinlock);
-			MUDEF muSpinlock mu_spinlock_destroy(muSpinlock spinlock);
+				// @DOCLINE The function `mu_mutex_destroy` destroys a mutex, defined below: @NLNT
+				MUDEF muMutex mu_mutex_destroy(muMutex mutex);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF muMutex mu_mutex_destroy_(mumResult* result, muMutex mutex);
 
-			MUDEF void mu_spinlock_lock_(mumResult* result, muSpinlock spinlock);
-			MUDEF void mu_spinlock_lock(muSpinlock spinlock);
+			// @DOCLINE ### Mutex locking and unlocking
 
-			MUDEF void mu_spinlock_unlock_(mumResult* result, muSpinlock spinlock);
-			MUDEF void mu_spinlock_unlock(muSpinlock spinlock);
+				// @DOCLINE The function `mu_mutex_lock` locks a mutex, defined below: @NLNT
+				MUDEF void mu_mutex_lock(muMutex mutex);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF void mu_mutex_lock_(mumResult* result, muMutex mutex);
+
+				// @DOCLINE The function `mu_mutex_unlock` unlocks a mutex, defined below: @NLNT
+				MUDEF void mu_mutex_unlock(muMutex mutex);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF void mu_mutex_unlock_(mumResult* result, muMutex mutex);
+
+		// @DOCLINE ## Spinlock functions
+
+			// @DOCLINE ### Spinlock creation and destruction
+
+				// @DOCLINE The function `mu_spinlock_create` creates a spinlock, defined below: @NLNT
+				MUDEF muSpinlock mu_spinlock_create(void);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF muSpinlock mu_spinlock_create_(mumResult* result);
+
+				// @DOCLINE The function `mu_spinlock_destroy` destroys a spinlock, defined below: @NLNT
+				MUDEF muSpinlock mu_spinlock_destroy(muSpinlock spinlock);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF muSpinlock mu_spinlock_destroy_(mumResult* result, muSpinlock spinlock);
+
+			// @DOCLINE ### Spinlock locking and unlocking
+
+				// @DOCLINE The function `mu_spinlock_lock` locks a spinlock, defined below: @NLNT
+				MUDEF void mu_spinlock_lock(muSpinlock spinlock);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF void mu_spinlock_lock_(mumResult* result, muSpinlock spinlock);
+
+				// @DOCLINE The function `mu_spinlock_unlock` unlocks a spinlock, defined below: @NLNT
+				MUDEF void mu_spinlock_unlock(muSpinlock spinlock);
+				// @DOCLINE Its explicit result checking equivalent is defined below: @NLNT
+				MUDEF void mu_spinlock_unlock_(mumResult* result, muSpinlock spinlock);
 
 	#ifdef __cplusplus
 	}
@@ -888,4 +1028,3 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ------------------------------------------------------------------------------
 */
-
