@@ -1,10 +1,11 @@
-# muMultithreading v1.0.0
+
+# muMultithreading v2.0.0
 
 muMultithreading (acrynomized to mum) is a public domain header-only single-file C library for cross-platform multithreading. To use it, download the `muMultithreading.h` file, add it to your include path, and include it like so:
 
 ```c
 #define MUM_IMPLEMENTATION
-#include <muMultithreading.h>
+#include "muMultithreading.h"
 ```
 
 More information about the general structure of a mu library is provided at [the mu library information GitHub repository.](https://github.com/Muukid/mu-library-information)
@@ -21,7 +22,7 @@ mum is licensed under public domain or MIT, whichever you prefer. More informati
 
 mum has a dependency on:
 
-[muMemoryAllocator v1.0.0](https://github.com/Muukid/muMemoryAllocator/tree/v1.0.0)
+[muUtility commit 2b34ba6](https://github.com/Muukid/muUtility/#diff-ce63462d8fced3767ed5df21ba8a9476337e51ee1ba9fa2d5a116e14f87571e2)
 
 Note that mu libraries store their dependencies within their files, so you don't need to import these dependencies yourself.
 
@@ -33,236 +34,313 @@ muMultithreading is built for POSIX and Win32.
 
 For POSIX, in particular, pthreads is needed. This means that pthread needs to be linked to, usually with `-pthread`.
 
-# Thread safety
 
-mum, on default, has no thread safety, but can be made automatically thread safe by defining `MU_THREADSAFE`. Once on, this protects threads, mutexes, spinlocks, and locks from being accessed by multiple threads at once.
+# C standard library dependencies
 
-# Functions
+mum has several C standard library dependencies not provided by its other library dependencies, all of which are overridable by defining them before MUM_H is defined. The following is a list of those dependencies. Note that defining all of the dependencies of a C standard library file prevents it from being included.
 
-## Initiation / Termination
+## `stdlib.h` dependencies
 
-The functions `mum_init` and `mum_term` initiate and terminate mum respectively, defined below:
+`mu_malloc`: equivalent to malloc.
 
-```c
-MUDEF void mum_init(mumResult* result);
-MUDEF void mum_term(mumResult* result);
-```
+`mu_free`: equivalent to free.
 
-## Threads
+## `string.h` dependencies
 
-### Creation / Destruction
-
-The functions `mu_thread_create` and `mu_thread_destroy` create and destroy a thread respectively, defined below:
-
-```c
-MUDEF muThread mu_thread_create(mumResult* result, void (*start)(void* args), void* args);
-MUDEF muThread mu_thread_destroy(mumResult* result, muThread thread);
-```
-
-Note that there is a delay between `mu_thread_create` being called and the thread's execution beginning. This means that, for example, if multiple threads are created in sequence, the order of thread execution cannot be guaranteed.
-
-### Exit
-
-The function `mu_thread_exit` exits from the current thread, defined below:
-
-```c
-MUDEF void mu_thread_exit(void* ret);
-```
-
-This function is meant to be called from within a thread, and is expected to be called at *some* point during the thread's lifetime.
-
-`ret` is the value that will be returned if `mu_thread_get_return_value` is called for this thread.
-
-### Wait
-
-The function `mu_thread_wait` waits for a given thread to finish executing, defined below:
-
-```c
-MUDEF void mu_thread_wait(mumResult* result, muThread thread);
-```
-
-### Get return value
-
-The function `mu_thread_get_return_value` returns the value passed into `mu_thread_exit` by the thread during its execution, defined below:
-
-```c
-MUDEF void* mu_thread_get_return_value(mumResult* result, muThread thread);
-```
-
-Note that this function may not perform correctly unless `mu_thread_wait` has been called for the given thread beforehand, even if it can be guaranteed that the thread will have already been finished by now.
-
-## Lock
-
-A lock (represented as `muLock`) is, on default, a [mutex](https://en.wikipedia.org/wiki/Lock_(computer_science) (`muMutex`), unless `MU_SPINLOCK` is defined, in which case it is a [spinlock](https://en.wikipedia.org/wiki/Spinlock) (`muSpinlock`).
-
-### Creation / Destruction
-
-The functions `mu_lock_create` and `mu_lock_destroy` create and destroy a lock, defined below:
-
-```c
-MUDEF muLock mu_lock_create(mumResult* result);
-MUDEF muLock mu_lock_destroy(mumResult* result, muLock lock);
-```
-
-### Lock/Unlock
-
-The functions `mu_lock_lock` and `mu_lock_unlock` lock and unlock a lock, defined below:
-
-```c
-MUDEF void mu_lock_lock(mumResult* result, muLock lock);
-MUDEF void mu_lock_unlock(mumResult* result, muLock lock);
-```
-
-Note that `mu_lock_lock` can wait theroetically indefinitely on a lock, so be careful when calling it.
-
-## Mutex
-
-### Creation / Destruction
-
-The functions `mu_mutex_create` and `mu_mutex_destroy` create and destroy a mutex, defined below:
-
-```c
-MUDEF muMutex mu_mutex_create(mumResult* result);
-MUDEF muMutex mu_mutex_destroy(mumResult* result, muMutex mutex);
-```
-
-### Lock/Unlock
-
-The functions `mu_mutex_lock` and `mu_mutex_unlock` lock and unlock a mutex, defined below:
-
-```c
-MUDEF void mu_mutex_lock(mumResult* result, muMutex mutex);
-MUDEF void mu_mutex_unlock(mumResult* result, muMutex mutex);
-```
-
-Note that `mu_mutex_lock` can wait theroetically indefinitely on a lock, so be careful when calling it.
-
-## Spinlock
-
-### Creation / Destruction
-
-The functions `mu_spinlock_create` and `mu_spinlock_destroy` create and destroy a spinlock, defined below:
-
-```c
-MUDEF muSpinlock mu_spinlock_create(mumResult* result);
-MUDEF muSpinlock mu_spinlock_destroy(mumResult* result, muSpinlock spinlock);
-```
-
-### Lock/Unlock
-
-The functions `mu_mutex_lock` and `mu_mutex_unlock` lock and unlock a spinlock, defined below:
-
-```c
-MUDEF void mu_spinlock_lock(mumResult* result, muSpinlock spinlock);
-MUDEF void mu_spinlock_unlock(mumResult* result, muSpinlock spinlock);
-```
-
-Note that `mu_spinlock_lock` can wait theroetically indefinitely on a lock, so be careful when calling it.
-
-## Names
-
-The function `mum_result_get_name` takes a `mumResult` value and returns a `const char*` representation of it, defined below:
-
-```c
-MUDEF const char* mum_result_get_name(mumResult result);
-```
-
-Note that this function is only defined if `MUM_NAMES` is defined before the header of mum.
-
-# Macros
-
-## Thread
-
-The object `muThread` is an ID reference represented by the type `size_m`. It represents a [thread](https://en.wikipedia.org/wiki/Thread_(computing)).
-
-## muLock
-
-The object `muLock` is an ID reference represented by the type `size_m`. It represents a [lock](https://en.wikipedia.org/wiki/Lock_(computer_science)).
-
-### `MU_SPINLOCK`
-
-On default, the object `muLock` is a mutex. However, if `MU_SPINLOCK` is defined before the header of mum is defined, `muLock` will be a spinlock, and the functions `mu_lock_create`, `mu_lock_destroy`, `mu_lock_lock`, and `mu_lock_unlock` will internally change accordingly.
-
-## Mutex
-
-The object `muMutex` is an ID reference represented by the type `size_m`. It represents a [mutex](https://en.wikipedia.org/wiki/Lock_(computer_science)).
-
-## Spinlock
-
-The object `muSpinlock` is an ID reference represented by the type `size_m`. It represents a [spinlock](https://en.wikipedia.org/wiki/Spinlock).
-
-## `MUM_NAMES`
-
-If `MUM_NAMES` is defined before the header of mum is defined, the function `mum_result_get_name` is defined.
-
-## Version macro
-
-mum defines three macros to define the version of mum: `MUM_VERSION_MAJOR`, `MUM_VERSION_MINOR`, and `MUM_VERSION_PATCH`, following the format of:
-
-```
-vMAJOR.MINOR.PATCH
-```
+`mu_memcpy`: equivalent to memcpy.
 
 # Enumerators
 
 ## Result enumerator
 
-mum uses the `mumResult` enumerator to represent how a function went. It has these possible values:
+mum uses the `mumResult` enumerator to represent how a function went. It has the following possible values.
+
+
+### General result enumerators
 
 `MUM_SUCCESS`: the task succeeded.
 
-`MUM_MUMA_SUCCESS`: a call to a muma function was made, which gave the result `MUMA_SUCCESS`.
+`MUM_FAILED_ALLOCATE`: memory necessary to complete the task failed to allocate.
 
-`MUM_MUMA_FAILED_TO_ALLOCATE`: a call to a muma function was made, which gave the result `MUMA_FAILED_TO_ALLOCATE`.
+### Win32-specific result enumerators
 
-`MUM_MUMA_INVALID_INDEX`: a call to a muma function was made, which gave the result `MUMA_INVALID_INDEX`.
+`MUM_FAILED_CREATE_THREAD`: a call to `CreateThread` failed, and the thread has not been created.
 
-`MUM_MUMA_INVALID_SHIFT_AMOUNT`: a call to a muma function was made, which gave the result `MUMA_INVALID_SHIFT_AMOUNT`.
+`MUM_FAILED_CLOSE_HANDLE`: a call to `CloseHandle` failed, and the object has not been destroyed.
 
-`MUM_MUMA_NOT_FOUND`: a call to a muma function was made, which gave the result `MUMA_NOT_FOUND`.
+`MUM_FAILED_GET_EXIT_CODE_THREAD`: a call to `GetExitCodeThread` failed, and the return value could not be retrieved.
 
-`MUM_ALLOCATION_FAILED`: an allocation call failed.
+`MUM_THREAD_WAIT_TIMEOUT`: a call to `WaitForSingleObject` returned `WAIT_TIMEOUT`, and the thread has been reset.
 
-`MUM_ALREADY_INITIALIZED`: a call to a function assuming that mum hadn't been initialized (most likely `mum_init`) was made when mum was initialized.
+`MUM_THREAD_WAIT_FAILED`: a call to `WaitForSingleObject` returned `WAIT_FAILED`, and the thread's state is unknown.
 
-`MUM_ALREADY_TERMINATED`: a call to a function assuming that mum had already been terminated (most likely `mum_term`) was made when mum was terminated.
+`MUM_FAILED_CREATE_MUTEX`: a call to `CreateMutex` failed, and the mutex has not been created.
 
-`MUM_NOT_YET_INITIALIZED`: a call to a function that needs mum to be initialized to perform correctly was made when mum wasn't initialized.
+`MUM_MUTEX_WAIT_FAILED`: a call to `WaitForSingleObject` returned `WAIT_FAILED`, most likley implying that the mutex has been closed whilst waiting.
 
-`MUM_CREATE_CALL_FAILED`: a system call to create a given object failed.
+`MUM_MUTEX_WAIT_ABANDONED`: a call to `WaitForSingleObject` returned `WAIT_ABANDONED`, meaning that the thread holding the mutex has closed before unlocking it; the mutex is unlocked; see [this](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject).
 
-`MUM_DESTROY_CALL_FAILED`: a system call to destroy a given object failed.
+`MUM_FAILED_RELEASE_MUTEX`: a call to `ReleaseMutex` failed; the thread that called this function does not have it locked.
 
-`MUM_WAIT_CALL_FAILED`: a system call to wait on a given object failed.
+### Unix-specific result enumerators
 
-`MUM_LOCK_CALL_FAILED`: a system call to lock a given object failed.
+`MUM_FAILED_PTHREAD_CREATE`: a call to `pthread_create` failed, and the thread has not been created.
 
-`MUM_UNLOCK_CALL_FAILED`: a system call to unlock a given object failed.
+`MUM_FAILED_PTHREAD_CANCEL`: a call to `pthread_cancel` failed, and the thread has not been destroyed.
 
-`MUM_GET_RETURN_VALUE_CALL_FAILED`: a system call to get the return value of a given object (most likely a thread) failed. Note that this can happen if you didn't call `mu_thread_wait` on a thread.
+`MUM_FAILED_PTHREAD_JOIN`: a call to `pthread_join` failed.
 
-`MUM_INVALID_ID`: a given object was invalid.
+`MUM_FAILED_PTHREAD_MUTEX_INIT`: a call to `pthread_mutex_init` failed, and the mutex has not been created.
 
-`MUM_THREAD_TIMED_OUT`: a thread timed out.
+`MUM_FAILED_PTHREAD_MUTEX_DESTROY`: a call to `pthread_mutex_destroy` failed, and the mutex has not been destroyed.
 
-`MUM_PREVIOUS_THREAD_CLOSED_BEFORE_LOCK`: the thread controlling the lock previously was closed. The lock has still been successfully locked.
+`MUM_FAILED_PTHREAD_MUTEX_LOCK`: a call to `pthread_mutex_lock` failed, and the mutex has not been locked.
 
-Unless specified otherwise, if the result of a function does not equal `MUM_SUCCESS`, whatever the function was supposed to do failed, and it will be as if the function was never called (meaning the function call had no permanent effect).
+`MUM_FAILED_PTHREAD_MUTEX_UNLOCK`: a call to `pthread_mutex_unlock` failed, and the mutex has not been unlocked.
 
-# Global variables
+# Macros
 
-## Context
+## Object macros
 
-The variable `mum_global_context` is used to refer to the context of mum globally, defined below:
+There are several macros used to represent an object, which are all macros for the type `void*`. These are:
+
+`muThread`: a [thread](https://en.wikipedia.org/wiki/Thread_(computing)).
+
+`muMutex`: a [mutex](https://en.wikipedia.org/wiki/Lock_(computer_science)).
+
+`muSpinlock`: a [spinlock](https://en.wikipedia.org/wiki/Spinlock).
+
+## Version macros
+
+There are three major, minor, and patch macros respectively defined to represent the version of mum, defined as `MUM_VERSION_MAJOR`, `MUM_VERSION_MINOR`, and `MUM_VERSION_PATCH`, following the formatting of `vMAJOR.MINOR.PATCH`.
+
+# Functions
+
+## Global result
+
+### Global result
+
+The function `mum_global_result` sets the global result pointer assumed by all non-result-checking functions to the given value, defined below: 
 
 ```c
-MUDEF mumContext* mum_global_context;
+MUDEF void mum_global_result(mumResult* result);
 ```
 
-This context is 0, or `MU_NULL_PTR`, if mum is not currently initiated. This variable can be checked by the user, but should not be written to.
 
-# Incomplete types
+Note that the assumed global result pointer is 0, and can be safely left as this or later set to this via this function to not check the result of functions.
 
-## Context type
+## Names
 
-mum has an incomplete type defined in its header called `mumContext` that represents the context of mum. This context is not meant to be used by the user, and is later defined in the implementation.
+All the functions within this section are not defined unless `MUM_NAMES` was defined before mum was included.
+
+### Get name of result
+
+The function `mum_result_get_name` returns a `const char*` representation of the given result enum value, defined below: 
+
+```c
+MUDEF const char* mum_result_get_name(mumResult result);
+```
+
+
+## Thread functions
+
+### Thread creation and destruction
+
+The function `mu_thread_create` creates a thread, defined below: 
+
+```c
+MUDEF muThread mu_thread_create(void (*start)(void* args), void* args);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF muThread mu_thread_create_(mumResult* result, void (*start)(void* args), void* args);
+```
+
+
+Note that there is a delay between thread creation being called and the thread's execution beginning. This means that, for example, if multiple threads are created in sequence, the order of the given threads beginning execution cannot be guaranteed.
+
+The function `mu_thread_destroy` destroys a thread, defined below: 
+
+```c
+MUDEF muThread mu_thread_destroy(muThread thread);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF muThread mu_thread_destroy_(mumResult* result, muThread thread);
+```
+
+
+### Thread exiting
+
+The function `mu_thread_exit` exits from the current thread with a return value, defined below: 
+
+```c
+MUDEF void mu_thread_exit(void* ret);
+```
+
+
+This function is meant to be called from within a thread, and is expected to be called at *some* point during the thread's lifetime; if this function is not called during a created thread's lifetime, resulting behaviour is undefined.
+
+### Thread waiting
+
+The function `mu_thread_wait` waits on a thread to finish executing, defined below: 
+
+```c
+MUDEF void mu_thread_wait(muThread thread);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF void mu_thread_wait_(mumResult* result, muThread thread);
+```
+
+
+### Retrieving thread return value
+
+The function `mu_thread_get_return_value` retrieves the value passed to `mu_thread_exit` by a thread, defined below: 
+
+```c
+MUDEF void* mu_thread_get_return_value(muThread thread);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF void* mu_thread_get_return_value_(mumResult* result, muThread thread);
+```
+
+
+This function may not perform correctly unless `mu_thread_wait` has been called for the given thread beforehand, even if it can be guaranteed that the thread will have already been finished by now.
+
+## Mutex functions
+
+### Mutex creation and destruction
+
+The function `mu_mutex_create` creates a mutex, defined below: 
+
+```c
+MUDEF muMutex mu_mutex_create(void);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF muMutex mu_mutex_create_(mumResult* result);
+```
+
+
+The function `mu_mutex_destroy` destroys a mutex, defined below: 
+
+```c
+MUDEF muMutex mu_mutex_destroy(muMutex mutex);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF muMutex mu_mutex_destroy_(mumResult* result, muMutex mutex);
+```
+
+
+### Mutex locking and unlocking
+
+The function `mu_mutex_lock` locks a mutex, defined below: 
+
+```c
+MUDEF void mu_mutex_lock(muMutex mutex);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF void mu_mutex_lock_(mumResult* result, muMutex mutex);
+```
+
+
+The function `mu_mutex_unlock` unlocks a mutex, defined below: 
+
+```c
+MUDEF void mu_mutex_unlock(muMutex mutex);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF void mu_mutex_unlock_(mumResult* result, muMutex mutex);
+```
+
+
+## Spinlock functions
+
+### Spinlock creation and destruction
+
+The function `mu_spinlock_create` creates a spinlock, defined below: 
+
+```c
+MUDEF muSpinlock mu_spinlock_create(void);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF muSpinlock mu_spinlock_create_(mumResult* result);
+```
+
+
+The function `mu_spinlock_destroy` destroys a spinlock, defined below: 
+
+```c
+MUDEF muSpinlock mu_spinlock_destroy(muSpinlock spinlock);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF muSpinlock mu_spinlock_destroy_(mumResult* result, muSpinlock spinlock);
+```
+
+
+### Spinlock locking and unlocking
+
+The function `mu_spinlock_lock` locks a spinlock, defined below: 
+
+```c
+MUDEF void mu_spinlock_lock(muSpinlock spinlock);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF void mu_spinlock_lock_(mumResult* result, muSpinlock spinlock);
+```
+
+
+The function `mu_spinlock_unlock` unlocks a spinlock, defined below: 
+
+```c
+MUDEF void mu_spinlock_unlock(muSpinlock spinlock);
+```
+
+
+Its explicit result checking equivalent is defined below: 
+
+```c
+MUDEF void mu_spinlock_unlock_(mumResult* result, muSpinlock spinlock);
+```
+
