@@ -320,11 +320,17 @@ More explicit license information at the end of file.
 			MUM_FAILED_GET_EXIT_CODE_THREAD,
 			MUM_THREAD_WAIT_TIMEOUT,
 			MUM_THREAD_WAIT_FAILED,
+			MUM_FAILED_CREATE_MUTEX,
+			MUM_MUTEX_WAIT_FAILED,
+			MUM_MUTEX_WAIT_ABANDONED,
+			MUM_FAILED_RELEASE_MUTEX,
 		)
 
 	/* Macros */
 
 		#define muThread void*
+		#define muMutex void*
+		#define muSpinlock void*
 
 	/* Functions */
 
@@ -351,6 +357,34 @@ More explicit license information at the end of file.
 
 			MUDEF void* mu_thread_get_return_value_(mumResult* result, muThread thread);
 			MUDEF void* mu_thread_get_return_value(muThread thread);
+
+		/* Mutex */
+
+			MUDEF muMutex mu_mutex_create_(mumResult* result);
+			MUDEF muMutex mu_mutex_create(void);
+
+			MUDEF muMutex mu_mutex_destroy_(mumResult* result, muMutex mutex);
+			MUDEF muMutex mu_mutex_destroy(muMutex mutex);
+
+			MUDEF void mu_mutex_lock_(mumResult* result, muMutex mutex);
+			MUDEF void mu_mutex_lock(muMutex mutex);
+
+			MUDEF void mu_mutex_unlock_(mumResult* result, muMutex mutex);
+			MUDEF void mu_mutex_unlock(muMutex mutex);
+
+		/* Spinlock */
+
+			MUDEF muSpinlock mu_spinlock_create_(mumResult* result);
+			MUDEF muSpinlock mu_spinlock_create(void);
+
+			MUDEF muSpinlock mu_spinlock_destroy_(mumResult* result, muSpinlock spinlock);
+			MUDEF muSpinlock mu_spinlock_destroy(muSpinlock spinlock);
+
+			MUDEF void mu_spinlock_lock_(mumResult* result, muSpinlock spinlock);
+			MUDEF void mu_spinlock_lock(muSpinlock spinlock);
+
+			MUDEF void mu_spinlock_unlock_(mumResult* result, muSpinlock spinlock);
+			MUDEF void mu_spinlock_unlock(muSpinlock spinlock);
 
 	#ifdef __cplusplus
 	}
@@ -384,6 +418,10 @@ More explicit license information at the end of file.
 						case MUM_FAILED_GET_EXIT_CODE_THREAD: return "MUM_FAILED_GET_EXIT_CODE_THREAD"; break;
 						case MUM_THREAD_WAIT_TIMEOUT: return "MUM_THREAD_WAIT_TIMEOUT"; break;
 						case MUM_THREAD_WAIT_FAILED: return "MUM_THREAD_WAIT_FAILED"; break;
+						case MUM_FAILED_CREATE_MUTEX: return "MUM_FAILED_CREATE_MUTEX"; break;
+						case MUM_MUTEX_WAIT_FAILED: return "MUM_MUTEX_WAIT_FAILED"; break;
+						case MUM_MUTEX_WAIT_ABANDONED: return "MUM_MUTEX_WAIT_ABANDONED"; break;
+						case MUM_FAILED_RELEASE_MUTEX: return "MUM_FAILED_RELEASE_MUTEX"; break;
 					}
 				}
 			#endif
@@ -480,6 +518,141 @@ More explicit license information at the end of file.
 			}
 			MUDEF void* mu_thread_get_return_value(muThread thread) {
 				return mu_thread_get_return_value_(mum_global_res, thread);
+			}
+
+		/* Mutex */
+
+			struct mum_win32_mutex {
+				HANDLE handle;
+			};
+			typedef struct mum_win32_mutex mum_win32_mutex;
+
+			MUDEF muMutex mu_mutex_create_(mumResult* result) {
+				mum_win32_mutex* p = (mum_win32_mutex*)mu_malloc(sizeof(mum_win32_mutex));
+				if (!p) {
+					MU_SET_RESULT(result, MUM_FAILED_ALLOCATE)
+					return 0;
+				}
+
+				p->handle = CreateMutex(0, MU_FALSE, 0);
+				if (p->handle == 0) {
+					MU_SET_RESULT(result, MUM_FAILED_CREATE_MUTEX)
+					mu_free(p);
+					return 0;
+				}
+
+				return (muMutex)p;
+			}
+			MUDEF muMutex mu_mutex_create(void) {
+				return mu_mutex_create_(mum_global_res);
+			}
+
+			MUDEF muMutex mu_mutex_destroy_(mumResult* result, muMutex mutex) {
+				mum_win32_mutex* p = (mum_win32_mutex*)mutex;
+
+				if (CloseHandle(p->handle) == 0) {
+					MU_SET_RESULT(result, MUM_FAILED_CLOSE_HANDLE)
+					return p;
+				}
+
+				mu_free(p);
+				return 0;
+			}
+			MUDEF muMutex mu_mutex_destroy(muMutex mutex) {
+				return mu_mutex_destroy_(mum_global_res, mutex);
+			}
+
+			MUDEF void mu_mutex_lock_(mumResult* result, muMutex mutex) {
+				mum_win32_mutex* p = (mum_win32_mutex*)mutex;
+
+				DWORD wait_result = WaitForSingleObject(p->handle, INFINITE);
+
+				switch (wait_result) {
+					// The mutex has most likely been closed. This should pretty much never happen with
+					// the way mum is set up, but if it has, that's really bad. Most likely, rather mum
+					// is not working as intended at all, or the user has modified things that they
+					// shouldn't.
+					case WAIT_FAILED: {
+						MU_SET_RESULT(result, MUM_MUTEX_WAIT_FAILED)
+					} break;
+
+					// The thread holding the mutex has died. This can be due to a few things:
+					// * The thread crashed or otherwise imploded in on itself.
+					// * The user has fiddled around with values they shouldn't.
+					// Either way, this is REALLY, REALLY bad, and will lead to sporadic random bugs &
+					// crashes.
+					// Note: we still have ownership due to this, but ehhhhh.
+					// https://devblogs.microsoft.com/oldnewthing/20050912-14/?p=34253
+					// (Raymond Chen is awesome btw)
+					case WAIT_ABANDONED: {
+						MU_SET_RESULT(result, MUM_MUTEX_WAIT_ABANDONED)
+					} break;
+				}
+			}
+			MUDEF void mu_mutex_lock(muMutex mutex) {
+				mu_mutex_lock_(mum_global_res, mutex);
+			}
+
+			MUDEF void mu_mutex_unlock_(mumResult* result, muMutex mutex) {
+				mum_win32_mutex* p = (mum_win32_mutex*)mutex;
+
+				if (ReleaseMutex(p->handle) == 0) {
+					MU_SET_RESULT(result, MUM_FAILED_RELEASE_MUTEX)
+				}
+			}
+			MUDEF void mu_mutex_unlock(muMutex mutex) {
+				mu_mutex_unlock_(mum_global_res, mutex);
+			}
+
+		/* Spinlock */
+
+			struct mum_win32_spinlock {
+				LONG volatile locked;
+			};
+			typedef struct mum_win32_spinlock mum_win32_spinlock;
+
+			MUDEF muSpinlock mu_spinlock_create_(mumResult* result) {
+				mum_win32_spinlock* p = (mum_win32_spinlock*)mu_malloc(sizeof(mum_win32_spinlock));
+				if (!p) {
+					MU_SET_RESULT(result, MUM_FAILED_ALLOCATE)
+					return 0;
+				}
+
+				p->locked = 0;
+				return p;
+			}
+			MUDEF muSpinlock mu_spinlock_create(void) {
+				return mu_spinlock_create_(mum_global_res);
+			}
+
+			MUDEF muSpinlock mu_spinlock_destroy_(mumResult* result, muSpinlock spinlock) {
+				mu_free(spinlock);
+				return 0; if (result) {}
+			}
+			MUDEF muSpinlock mu_spinlock_destroy(muSpinlock spinlock) {
+				return mu_spinlock_destroy_(mum_global_res, spinlock);
+			}
+
+			MUDEF void mu_spinlock_lock_(mumResult* result, muSpinlock spinlock) {
+				mum_win32_spinlock* p = (mum_win32_spinlock*)spinlock;
+
+				while (InterlockedCompareExchange(&p->locked, 1, 0) == 1) {}
+
+				return; if (result) {}
+			}
+			MUDEF void mu_spinlock_lock(muSpinlock spinlock) {
+				mu_spinlock_lock_(mum_global_res, spinlock);
+			}
+
+			MUDEF void mu_spinlock_unlock_(mumResult* result, muSpinlock spinlock) {
+				mum_win32_spinlock* p = (mum_win32_spinlock*)spinlock;
+
+				_interlockedbittestandreset(&p->locked, 0);
+
+				return; if (result) {}
+			}
+			MUDEF void mu_spinlock_unlock(muSpinlock spinlock) {
+				mu_spinlock_unlock_(mum_global_res, spinlock);
 			}
 
 	#endif
