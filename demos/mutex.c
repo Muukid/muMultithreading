@@ -130,7 +130,6 @@ int main(void) {
 	Thread #0 has finished
 	*/
 
-	Sleep(4000);
 	return 0;
 }
 
