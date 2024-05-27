@@ -5,7 +5,7 @@
 DEMO NAME:          threads.c
 DEMO WRITTEN BY:    Muukid
 CREATION DATE:      2024-04-13
-LAST UPDATED:       2024-04-13
+LAST UPDATED:       2024-05-26
 
 ============================================================
                         DEMO PURPOSE
@@ -22,8 +22,6 @@ whichever you prefer.
 More explicit license information at the end of file.
 
 ============================================================
-
-============================================================
                         ADDITIONAL NOTES
 
 This demo is largely inspired by this GeeksForGeeks page:
@@ -34,7 +32,7 @@ https://www.geeksforgeeks.org/mutex-lock-for-linux-thread-synchronization/
 // Include mum
 #define MUM_NAMES // (for mum_result_get_name)
 #define MUM_IMPLEMENTATION
-#include <muMultithreading.h>
+#include "muMultithreading.h"
 
 // Include stdio for printing
 #include <stdio.h>
@@ -56,17 +54,16 @@ void thread_func(void* args) {
 	printf("Thread #%i has finished\n", (int)id);
 	
 	// Exit the thread
-	mu_thread_exit(MU_NULL_PTR);
+	mu_thread_exit(0);
 }
 
+// Result + macro for checking result
+mumResult result = MUM_SUCCESS;
+#define scall(fun) if (result != MUM_SUCCESS) { printf("WARNING: '" #fun "' returned: %s\n", mum_result_get_name(result)); }
+
 int main(void) {
-	mumResult result = MUM_SUCCESS;
-
-	// Initiate mum
-
-	mum_init(&result);
-	if (result != MUM_SUCCESS)
-		printf("WARNING: mum_init returned %s\n", mum_result_get_name(result));
+	// Set global result
+	mum_global_result(&result);
 
 	// Setup an array to hold our threads and an array to hold the id for our threads that will be
 	// passed to the threads
@@ -77,28 +74,19 @@ int main(void) {
 	// Create our threads with a loop
 
 	for (size_m i = 0; i < 2; i++) {
-		threads[i] = mu_thread_create(&result, thread_func, &thread_ids[i]);
-		if (result != MUM_SUCCESS)
-			printf("WARNING: mu_thread_create returned %s\n", mum_result_get_name(result));
+		threads[i] = mu_thread_create(thread_func, &thread_ids[i]);
+		scall(mu_thread_create)
 	}
 
 	// Wait on all of our threads and destroy them
 
 	for (size_m i = 0; i < 2; i++) {
-		mu_thread_wait(&result, threads[i]);
-		if (result != MUM_SUCCESS)
-			printf("WARNING: mu_thread_wait returned %s\n", mum_result_get_name(result));
+		mu_thread_wait(threads[i]);
+		scall(mu_thread_wait)
 
-		mu_thread_destroy(&result, threads[i]);
-		if (result != MUM_SUCCESS)
-			printf("WARNING: mu_thread_destroy returned %s\n", mum_result_get_name(result));
+		mu_thread_destroy(threads[i]);
+		scall(mu_thread_destroy)
 	}
-
-	// Terminate
-
-	mum_term(&result);
-	if (result != MUM_SUCCESS)
-		printf("WARNING: mum_term returned %s\n", mum_result_get_name(result));
 
 	// The results of this demo's printing can vary, but they should contain these lines in no
 	// particular order:
@@ -109,6 +97,7 @@ int main(void) {
 	Thread #1 has finished
 	*/
 
+	Sleep(4000);
 	return 0;
 }
 
