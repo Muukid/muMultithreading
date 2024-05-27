@@ -36,6 +36,10 @@ https://www.geeksforgeeks.org/mutex-lock-for-linux-thread-synchronization/
 // Include stdio for printing
 #include <stdio.h>
 
+// Result + macro for checking result
+mumResult result = MUM_SUCCESS;
+#define scall(fun) if (result != MUM_SUCCESS) { printf("WARNING: '" #fun "' returned: %s\n", mum_result_get_name(result)); result = MUM_SUCCESS; }
+
 /* Create a function that our threads will run on */
 
 // Note: any thread function has to have this return type and parameters
@@ -55,10 +59,6 @@ void thread_func(void* args) {
 	// Exit the thread
 	mu_thread_exit(0);
 }
-
-// Result + macro for checking result
-mumResult result = MUM_SUCCESS;
-#define scall(fun) if (result != MUM_SUCCESS) { printf("WARNING: '" #fun "' returned: %s\n", mum_result_get_name(result)); }
 
 int main(void) {
 	// Set global result

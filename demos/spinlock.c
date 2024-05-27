@@ -40,7 +40,7 @@ https://www.geeksforgeeks.org/mutex-lock-for-linux-thread-synchronization/
 
 // Result + macro for checking result
 mumResult result = MUM_SUCCESS;
-#define scall(fun) if (result != MUM_SUCCESS) { printf("WARNING: '" #fun "' returned: %s\n", mum_result_get_name(result)); }
+#define scall(fun) if (result != MUM_SUCCESS) { printf("WARNING: '" #fun "' returned: %s\n", mum_result_get_name(result)); result = MUM_SUCCESS; }
 
 /* Create a function that our threads will run on */
 
