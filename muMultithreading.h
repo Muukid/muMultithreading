@@ -324,6 +324,15 @@ More explicit license information at the end of file.
 			MUM_MUTEX_WAIT_FAILED,
 			MUM_MUTEX_WAIT_ABANDONED,
 			MUM_FAILED_RELEASE_MUTEX,
+
+			// Unix
+			MUM_FAILED_PTHREAD_CREATE,
+			MUM_FAILED_PTHREAD_CANCEL,
+			MUM_FAILED_PTHREAD_JOIN,
+			MUM_FAILED_PTHREAD_MUTEX_INIT,
+			MUM_FAILED_PTHREAD_MUTEX_DESTROY,
+			MUM_FAILED_PTHREAD_MUTEX_LOCK,
+			MUM_FAILED_PTHREAD_MUTEX_UNLOCK,
 		)
 
 	/* Macros */
@@ -422,9 +431,55 @@ More explicit license information at the end of file.
 						case MUM_MUTEX_WAIT_FAILED: return "MUM_MUTEX_WAIT_FAILED"; break;
 						case MUM_MUTEX_WAIT_ABANDONED: return "MUM_MUTEX_WAIT_ABANDONED"; break;
 						case MUM_FAILED_RELEASE_MUTEX: return "MUM_FAILED_RELEASE_MUTEX"; break;
+						case MUM_FAILED_PTHREAD_CREATE: return "MUM_FAILED_PTHREAD_CREATE"; break;
+						case MUM_FAILED_PTHREAD_CANCEL: return "MUM_FAILED_PTHREAD_CANCEL"; break;
+						case MUM_FAILED_PTHREAD_JOIN: return "MUM_FAILED_PTHREAD_JOIN"; break;
+						case MUM_FAILED_PTHREAD_MUTEX_INIT: return "MUM_FAILED_PTHREAD_MUTEX_INIT"; break;
+						case MUM_FAILED_PTHREAD_MUTEX_DESTROY: return "MUM_FAILED_PTHREAD_MUTEX_DESTROY"; break;
+						case MUM_FAILED_PTHREAD_MUTEX_LOCK: return "MUM_FAILED_PTHREAD_MUTEX_LOCK"; break;
+						case MUM_FAILED_PTHREAD_MUTEX_UNLOCK: return "MUM_FAILED_PTHREAD_MUTEX_UNLOCK"; break;
 					}
 				}
 			#endif
+
+		/* Repetitious functions */
+
+			MUDEF muThread mu_thread_create(void (*start)(void* args), void* args) {
+				return mu_thread_create_(mum_global_res, start, args);
+			}
+			MUDEF muThread mu_thread_destroy(muThread thread) {
+				return mu_thread_destroy_(mum_global_res, thread);
+			}
+			MUDEF void mu_thread_wait(muThread thread) {
+				mu_thread_wait_(mum_global_res, thread);
+			}
+			MUDEF void* mu_thread_get_return_value(muThread thread) {
+				return mu_thread_get_return_value_(mum_global_res, thread);
+			}
+			MUDEF muMutex mu_mutex_create(void) {
+				return mu_mutex_create_(mum_global_res);
+			}
+			MUDEF muMutex mu_mutex_destroy(muMutex mutex) {
+				return mu_mutex_destroy_(mum_global_res, mutex);
+			}
+			MUDEF void mu_mutex_lock(muMutex mutex) {
+				mu_mutex_lock_(mum_global_res, mutex);
+			}
+			MUDEF void mu_mutex_unlock(muMutex mutex) {
+				mu_mutex_unlock_(mum_global_res, mutex);
+			}
+			MUDEF muSpinlock mu_spinlock_create(void) {
+				return mu_spinlock_create_(mum_global_res);
+			}
+			MUDEF muSpinlock mu_spinlock_destroy(muSpinlock spinlock) {
+				return mu_spinlock_destroy_(mum_global_res, spinlock);
+			}
+			MUDEF void mu_spinlock_lock(muSpinlock spinlock) {
+				mu_spinlock_lock_(mum_global_res, spinlock);
+			}
+			MUDEF void mu_spinlock_unlock(muSpinlock spinlock) {
+				mu_spinlock_unlock_(mum_global_res, spinlock);
+			}
 
 	/* Win32 */
 
@@ -460,9 +515,6 @@ More explicit license information at the end of file.
 
 				return p;
 			}
-			MUDEF muThread mu_thread_create(void (*start)(void* args), void* args) {
-				return mu_thread_create_(mum_global_res, start, args);
-			}
 
 			MUDEF muThread mu_thread_destroy_(mumResult* result, muThread thread) {
 				mum_win32_thread* p = (mum_win32_thread*)thread;
@@ -474,9 +526,6 @@ More explicit license information at the end of file.
 
 				mu_free(thread);
 				return 0;
-			}
-			MUDEF muThread mu_thread_destroy(muThread thread) {
-				return mu_thread_destroy_(mum_global_res, thread);
 			}
 
 			MUDEF void mu_thread_exit(void* ret) {
@@ -499,9 +548,6 @@ More explicit license information at the end of file.
 					} break;
 				}
 			}
-			MUDEF void mu_thread_wait(muThread thread) {
-				mu_thread_wait_(mum_global_res, thread);
-			}
 
 			MUDEF void* mu_thread_get_return_value_(mumResult* result, muThread thread) {
 				mum_win32_thread* p = (mum_win32_thread*)thread;
@@ -515,9 +561,6 @@ More explicit license information at the end of file.
 				void* tp;
 				mu_memcpy(&tp, &exit_code, sizeof(DWORD));
 				return tp;
-			}
-			MUDEF void* mu_thread_get_return_value(muThread thread) {
-				return mu_thread_get_return_value_(mum_global_res, thread);
 			}
 
 		/* Mutex */
@@ -543,9 +586,6 @@ More explicit license information at the end of file.
 
 				return (muMutex)p;
 			}
-			MUDEF muMutex mu_mutex_create(void) {
-				return mu_mutex_create_(mum_global_res);
-			}
 
 			MUDEF muMutex mu_mutex_destroy_(mumResult* result, muMutex mutex) {
 				mum_win32_mutex* p = (mum_win32_mutex*)mutex;
@@ -557,9 +597,6 @@ More explicit license information at the end of file.
 
 				mu_free(p);
 				return 0;
-			}
-			MUDEF muMutex mu_mutex_destroy(muMutex mutex) {
-				return mu_mutex_destroy_(mum_global_res, mutex);
 			}
 
 			MUDEF void mu_mutex_lock_(mumResult* result, muMutex mutex) {
@@ -589,9 +626,6 @@ More explicit license information at the end of file.
 					} break;
 				}
 			}
-			MUDEF void mu_mutex_lock(muMutex mutex) {
-				mu_mutex_lock_(mum_global_res, mutex);
-			}
 
 			MUDEF void mu_mutex_unlock_(mumResult* result, muMutex mutex) {
 				mum_win32_mutex* p = (mum_win32_mutex*)mutex;
@@ -599,9 +633,6 @@ More explicit license information at the end of file.
 				if (ReleaseMutex(p->handle) == 0) {
 					MU_SET_RESULT(result, MUM_FAILED_RELEASE_MUTEX)
 				}
-			}
-			MUDEF void mu_mutex_unlock(muMutex mutex) {
-				mu_mutex_unlock_(mum_global_res, mutex);
 			}
 
 		/* Spinlock */
@@ -621,16 +652,10 @@ More explicit license information at the end of file.
 				p->locked = 0;
 				return p;
 			}
-			MUDEF muSpinlock mu_spinlock_create(void) {
-				return mu_spinlock_create_(mum_global_res);
-			}
 
 			MUDEF muSpinlock mu_spinlock_destroy_(mumResult* result, muSpinlock spinlock) {
 				mu_free(spinlock);
 				return 0; if (result) {}
-			}
-			MUDEF muSpinlock mu_spinlock_destroy(muSpinlock spinlock) {
-				return mu_spinlock_destroy_(mum_global_res, spinlock);
 			}
 
 			MUDEF void mu_spinlock_lock_(mumResult* result, muSpinlock spinlock) {
@@ -640,9 +665,6 @@ More explicit license information at the end of file.
 
 				return; if (result) {}
 			}
-			MUDEF void mu_spinlock_lock(muSpinlock spinlock) {
-				mu_spinlock_lock_(mum_global_res, spinlock);
-			}
 
 			MUDEF void mu_spinlock_unlock_(mumResult* result, muSpinlock spinlock) {
 				mum_win32_spinlock* p = (mum_win32_spinlock*)spinlock;
@@ -651,8 +673,170 @@ More explicit license information at the end of file.
 
 				return; if (result) {}
 			}
-			MUDEF void mu_spinlock_unlock(muSpinlock spinlock) {
-				mu_spinlock_unlock_(mum_global_res, spinlock);
+
+	#endif
+
+	/* Unix */
+
+	#ifdef MU_UNIX
+
+		#include <pthread.h>
+
+		/* Thread */
+
+			struct mum_unix_thread {
+				pthread_t thread;
+				void* ret;
+			};
+			typedef struct mum_unix_thread mum_unix_thread;
+
+			MUDEF muThread mu_thread_create_(mumResult* result, void (*start)(void* args), void* args) {
+				mum_unix_thread* p = (mum_unix_thread*)mu_malloc(sizeof(mum_unix_thread));
+				if (!p) {
+					MU_SET_RESULT(result, MUM_FAILED_ALLOCATE)
+					return 0;
+				}
+
+				// Memcpy cuz C compilers are dumb
+				void* (*func)(void*);
+				mu_memcpy(&func, &start, sizeof(void*));
+
+				if (pthread_create(&p->thread, 0, func, args) != 0) {
+					MU_SET_RESULT(result, MUM_FAILED_PTHREAD_CREATE)
+					mu_free(p);
+					return 0;
+				}
+
+				return (muThread)p;
+			}
+
+			MUDEF muThread mu_thread_destroy_(mumResult* result, muThread thread) {
+				mum_unix_thread* p = (mum_unix_thread*)thread;
+
+				if (pthread_cancel(p->thread) != 0) {
+					MU_SET_RESULT(result, MUM_FAILED_PTHREAD_CANCEL)
+					return p;
+				}
+
+				mu_free(p);
+				return 0;
+			}
+
+			MUDEF void mu_thread_exit(void* ret) {
+				pthread_exit(ret);
+			}
+
+			MUDEF void mu_thread_wait_(mumResult* result, muThread thread) {
+				mum_unix_thread* p = (mum_unix_thread*)thread;
+
+				if (pthread_join(p->thread, &p->ret) != 0) {
+					MU_SET_RESULT(result, MUM_FAILED_PTHREAD_JOIN)
+					return;
+				}
+			}
+
+			MUDEF void* mu_thread_get_return_value_(mumResult* result, muThread thread) {
+				return ((mum_unix_thread*)thread)->ret;
+				if (result) {}
+			}
+
+		/* Mutex */
+
+			struct mum_unix_mutex {
+				pthread_mutex_t mutex;
+			};
+			typedef struct mum_unix_mutex mum_unix_mutex;
+
+			MUDEF muMutex mu_mutex_create_(mumResult* result) {
+				mum_unix_mutex* p = (mum_unix_mutex*)mu_malloc(sizeof(mum_unix_mutex));
+				if (!p) {
+					MU_SET_RESULT(result, MUM_FAILED_ALLOCATE)
+					return 0;
+				}
+
+				if (pthread_mutex_init(&p->mutex, 0) != 0) {
+					MU_SET_RESULT(result, MUM_FAILED_PTHREAD_MUTEX_INIT)
+					mu_free(p);
+					return 0;
+				}
+
+				return (muMutex)p;
+			}
+
+			MUDEF muMutex mu_mutex_destroy_(mumResult* result, muMutex mutex) {
+				mum_unix_mutex* p = (mum_unix_mutex*)mutex;
+
+				if (pthread_mutex_destroy(&p->mutex) != 0) {
+					MU_SET_RESULT(result, MUM_FAILED_PTHREAD_MUTEX_DESTROY)
+					return mutex;
+				}
+
+				mu_free(p);
+				return 0;
+			}
+
+			MUDEF void mu_mutex_lock_(mumResult* result, muMutex mutex) {
+				mum_unix_mutex* p = (mum_unix_mutex*)mutex;
+
+				if (pthread_mutex_lock(&p->mutex) != 0) {
+					MU_SET_RESULT(result, MUM_FAILED_PTHREAD_MUTEX_LOCK)
+				}
+			}
+
+			MUDEF void mu_mutex_unlock_(mumResult* result, muMutex mutex) {
+				mum_unix_mutex* p = (mum_unix_mutex*)mutex;
+
+				if (pthread_mutex_unlock(&p->mutex) != 0) {
+					MU_SET_RESULT(result, MUM_FAILED_PTHREAD_MUTEX_UNLOCK)
+				}
+			}
+
+		/* Spinlock */
+
+			struct mum_unix_spinlock {
+				int locked;
+			};
+			typedef struct mum_unix_spinlock mum_unix_spinlock;
+
+			MUDEF muSpinlock mu_spinlock_create_(mumResult* result) {
+				mum_unix_spinlock* p = (mum_unix_spinlock*)mu_malloc(sizeof(mum_unix_spinlock));
+				if (!p) {
+					MU_SET_RESULT(result, MUM_FAILED_ALLOCATE)
+					return 0;
+				}
+
+				p->locked = 0;
+				return (muSpinlock)p;
+			}
+
+			MUDEF muSpinlock mu_spinlock_destroy_(mumResult* result, muSpinlock spinlock) {
+				mu_free(spinlock);
+				return 0; if (result) {}
+			}
+
+			static inline muBool mum_atomic_compare_exchange(int* ptr, int compare, int exchange) {
+				return __atomic_compare_exchange_n(ptr, &compare, exchange, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+			}
+
+			MUDEF void mu_spinlock_lock_(mumResult* result, muSpinlock spinlock) {
+				mum_unix_spinlock* p = (mum_unix_spinlock*)spinlock;
+
+				while (!mum_atomic_compare_exchange(&p->locked, 0, 1)) {}
+
+				return; if (result) {}
+			}
+
+			static inline void mum_atomic_store(int* ptr, int value) {
+				if (value) {}
+				__atomic_store_n(ptr, 0, __ATOMIC_SEQ_CST);
+			}
+
+			MUDEF void mu_spinlock_unlock_(mumResult* result, muSpinlock spinlock) {
+				mum_unix_spinlock* p = (mum_unix_spinlock*)spinlock;
+
+				mum_atomic_store(&p->locked, 0);
+
+				return; if (result) {}
 			}
 
 	#endif
