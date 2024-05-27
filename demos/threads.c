@@ -13,8 +13,6 @@ LAST UPDATED:       2024-05-26
 This demo shows the basics behind using threads.
 
 ============================================================
-
-============================================================
                         LICENSE INFO
 
 All code is licensed under MIT License or public domain, 
@@ -26,6 +24,7 @@ More explicit license information at the end of file.
 
 This demo is largely inspired by this GeeksForGeeks page:
 https://www.geeksforgeeks.org/mutex-lock-for-linux-thread-synchronization/
+
 ============================================================
 */
 
@@ -97,7 +96,6 @@ int main(void) {
 	Thread #1 has finished
 	*/
 
-	Sleep(4000);
 	return 0;
 }
 
