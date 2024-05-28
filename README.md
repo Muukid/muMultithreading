@@ -22,7 +22,7 @@ mum is licensed under public domain or MIT, whichever you prefer. More informati
 
 mum has a dependency on:
 
-[muUtility commit 2b34ba6](https://github.com/Muukid/muUtility/#diff-ce63462d8fced3767ed5df21ba8a9476337e51ee1ba9fa2d5a116e14f87571e2)
+[muUtility v1.1.0](https://github.com/Muukid/muUtility/releases/tag/v1.1.0)
 
 Note that mu libraries store their dependencies within their files, so you don't need to import these dependencies yourself.
 
